@@ -22,7 +22,6 @@ export default function MicrophoneBlock(props: {
     <MicrophoneDeviceWrapper
       Icon={micOn ? MicIcon : MicOffIcon}
       onIconClick={onClickMute}
-      isActive={micOn}
       select={<MicrophoneSelect audioTrack={audioTrack} />}
       audioTrack={audioTrack}
     >
@@ -37,14 +36,12 @@ export function MicrophoneDeviceWrapper(props: {
     props: React.SVGProps<SVGSVGElement> & { active?: boolean },
   ) => React.ReactNode
   onIconClick: () => void
-  isActive: boolean
   select?: React.ReactNode
   audioTrack: IMicrophoneAudioTrack | null
 }) {
   const {
     Icon,
     onIconClick,
-    isActive,
     select,
     children,
     audioTrack
@@ -59,7 +56,7 @@ export function MicrophoneDeviceWrapper(props: {
             className="border-secondary bg-transparent w-32 flex-shrink-0"
             onClick={onIconClick}
           >
-            <Icon className="h-5 w-5" active={isActive} />
+            <Icon className="h-5 w-5" />
 
             <AudioVisualizer
               type="user"
