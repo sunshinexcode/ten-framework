@@ -111,7 +111,8 @@
     "deleteConnectionConfirmation": "確定要刪除此連線嗎？",
     "deleteConnectionSuccess": "連線刪除成功",
     "deleteConnectionFailed": "連線刪除失敗",
-    "replaceNode": "替換節點..."
+    "replaceNode": "替換節點...",
+    "manageApps": "管理應用程式"
   },
   "toast": {
     "saveFileSuccess": "檔案儲存成功",

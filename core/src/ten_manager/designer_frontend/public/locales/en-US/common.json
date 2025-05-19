@@ -111,7 +111,8 @@
     "deleteConnectionConfirmation": "Are you sure you want to delete the connection?",
     "deleteConnectionSuccess": "Connection deleted successfully",
     "deleteConnectionFailed": "Failed to delete connection",
-    "replaceNode": "Replace Node with ..."
+    "replaceNode": "Replace Node with ...",
+    "manageApps": "Manage Apps"
   },
   "toast": {
     "saveFileSuccess": "File saved successfully",
