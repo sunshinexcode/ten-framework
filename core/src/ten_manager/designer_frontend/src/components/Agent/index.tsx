@@ -11,10 +11,12 @@ import { BotMessageSquareIcon } from "lucide-react";
 import { useAppStore } from "@/store";
 import Avatar from "@/components/Agent/AvatarTrulience";
 
-export default function AgentView() {
+export default function AgentView(
+) {
   const remoteUsers = useRemoteUsers();
   const { track } = useRemoteUserTrack(remoteUsers[0], "audio");
-    const {preferences} = useAppStore();
+  const { preferences } = useAppStore();
+
 
   return (
     <div
