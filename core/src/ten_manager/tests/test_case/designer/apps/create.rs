@@ -52,6 +52,7 @@ mod tests {
             base_dir: temp_path,
             app_name: "test_app".to_string(),
             template_name: DEFAULT_APP_CPP.to_string(),
+            template_version: None,
         };
 
         let req = test::TestRequest::post()
@@ -61,12 +62,12 @@ mod tests {
 
         let resp = test::call_service(&app, req).await;
         if !resp.status().is_success() {
-            println!("resp: {:?}", resp);
+            println!("resp: {resp:?}");
 
             let body = test::read_body(resp).await;
             let body_str = std::str::from_utf8(&body).unwrap();
 
-            println!("body: {:?}", body_str);
+            println!("body: {body_str:?}");
 
             panic!("Failed to create app");
         }
@@ -99,6 +100,7 @@ mod tests {
             base_dir: "/non/existent/directory".to_string(),
             app_name: "test_app".to_string(),
             template_name: "default".to_string(),
+            template_version: None,
         };
 
         let req = test::TestRequest::post()
