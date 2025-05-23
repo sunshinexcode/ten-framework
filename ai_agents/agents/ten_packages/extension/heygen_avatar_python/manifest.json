@@ -19,10 +19,19 @@
   },
   "api": {
     "property": {
-      "api_key": {
+      "heygen_api_key": {
         "type": "string"
       },
-      "avatar_name": {
+      "agora_appid": {
+        "type": "string"
+      },
+      "agora_appcert": {
+        "type": "string"
+      },
+      "agora_channel_name": {
+        "type": "string"
+      },
+      "agora_avatar_uid": {
         "type": "string"
       }
     }
