@@ -57,6 +57,7 @@ mod tests {
         let connection = GraphConnection {
             app: Some("http://example.com:8000".to_string()),
             extension: "extension_1".to_string(),
+            subgraph: None,
             cmd: Some(vec![GraphMessageFlow {
                 name: "cmd_with_conversion".to_string(),
                 dest: vec![GraphDestination {
@@ -167,6 +168,7 @@ mod tests {
             ],
             connections: None,
             exposed_messages: None,
+            exposed_properties: None,
         };
 
         // Create a message conversion with fixed value.
@@ -292,6 +294,7 @@ mod tests {
             ],
             connections: None,
             exposed_messages: None,
+            exposed_properties: None,
         };
 
         // Create a message conversion with fixed value.
@@ -357,6 +360,7 @@ mod tests {
             ],
             connections: None,
             exposed_messages: None,
+            exposed_properties: None,
         };
 
         // Create a message conversion with fixed value.
@@ -423,6 +427,7 @@ mod tests {
             ],
             connections: None,
             exposed_messages: None,
+            exposed_properties: None,
         };
 
         // Create a message conversion with fixed value.
@@ -486,6 +491,7 @@ mod tests {
             ],
             connections: None,
             exposed_messages: None,
+            exposed_properties: None,
         };
 
         // Create a message conversion with from_original mode.
@@ -575,6 +581,7 @@ mod tests {
             ],
             connections: None,
             exposed_messages: None,
+            exposed_properties: None,
         };
 
         // Create a message conversion with both message and result conversion.
@@ -679,6 +686,7 @@ mod tests {
             ],
             connections: None,
             exposed_messages: None,
+            exposed_properties: None,
         };
 
         // Create an invalid message conversion with empty rules.
@@ -750,6 +758,7 @@ mod tests {
             ],
             connections: None,
             exposed_messages: None,
+            exposed_properties: None,
         };
 
         let msg_conversion = MsgAndResultConversion {
@@ -836,6 +845,7 @@ mod tests {
             ],
             connections: None,
             exposed_messages: None,
+            exposed_properties: None,
         };
 
         let msg_conversion = MsgAndResultConversion {
@@ -921,6 +931,7 @@ mod tests {
             ],
             connections: None,
             exposed_messages: None,
+            exposed_properties: None,
         };
 
         let msg_conversion = MsgAndResultConversion {
@@ -1007,6 +1018,7 @@ mod tests {
             ],
             connections: None,
             exposed_messages: None,
+            exposed_properties: None,
         };
 
         let msg_conversion = MsgAndResultConversion {

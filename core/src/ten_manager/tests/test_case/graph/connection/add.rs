@@ -52,6 +52,7 @@ mod tests {
         let connection1 = GraphConnection {
             app: Some("http://example.com:8000".to_string()),
             extension: "extension_1".to_string(),
+            subgraph: None,
             cmd: Some(vec![GraphMessageFlow {
                 name: "new_cmd1".to_string(),
                 dest: vec![GraphDestination {
@@ -68,6 +69,7 @@ mod tests {
         let connection2 = GraphConnection {
             app: Some("http://example.com:8000".to_string()),
             extension: "extension_1".to_string(),
+            subgraph: None,
             cmd: Some(vec![GraphMessageFlow {
                 name: "new_cmd2".to_string(),
                 dest: vec![GraphDestination {
@@ -138,6 +140,7 @@ mod tests {
             ],
             connections: None,
             exposed_messages: None,
+            exposed_properties: None,
         };
 
         // Test adding a connection.
@@ -196,6 +199,7 @@ mod tests {
             )],
             connections: None,
             exposed_messages: None,
+            exposed_properties: None,
         };
 
         // Test adding a connection with nonexistent source.
@@ -236,6 +240,7 @@ mod tests {
             )],
             connections: None,
             exposed_messages: None,
+            exposed_properties: None,
         };
 
         // Test adding a connection with nonexistent destination.
@@ -288,6 +293,7 @@ mod tests {
             ],
             connections: None,
             exposed_messages: None,
+            exposed_properties: None,
         };
 
         // Add first connection.
@@ -373,6 +379,7 @@ mod tests {
             ],
             connections: None,
             exposed_messages: None,
+            exposed_properties: None,
         };
 
         // Add different message types.
@@ -473,6 +480,7 @@ mod tests {
             ],
             connections: None,
             exposed_messages: None,
+            exposed_properties: None,
         };
 
         // Add a connection.
@@ -560,6 +568,7 @@ mod tests {
             ],
             connections: None,
             exposed_messages: None,
+            exposed_properties: None,
         };
 
         // Test connecting ext1 to ext2 with compatible schema - should succeed.
