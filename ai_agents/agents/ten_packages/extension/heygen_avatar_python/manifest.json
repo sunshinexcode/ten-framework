@@ -32,7 +32,7 @@
         "type": "string"
       },
       "agora_avatar_uid": {
-        "type": "string"
+        "type": "int64"
       }
     }
   },

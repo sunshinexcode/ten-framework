@@ -13,7 +13,7 @@ from ten import AsyncTenEnv
 
 class AgoraHeygenRecorder:
     def __init__(self, app_id: str, app_cert: str, heygen_api_key: str, channel_name: str, avatar_uid: int, ten_env: AsyncTenEnv):
-        if not app_id or not app_cert or not heygen_api_key:
+        if not app_id or not heygen_api_key:
             raise ValueError("AGORA_APP_ID, AGORA_APP_CERT, and HEYGEN_API_KEY must be provided.")
 
         self.app_id = app_id
@@ -38,6 +38,10 @@ class AgoraHeygenRecorder:
         self._should_reconnect = True
 
     def _generate_token(self, uid, role):
+        # if the app_cert is not required, return an empty string
+        if not self.app_cert:
+            return ""
+
         expire_time = 3600
         privilege_expired_ts = int(time()) + expire_time
         return RtcTokenBuilder.buildTokenWithUid(
@@ -67,7 +71,7 @@ class AgoraHeygenRecorder:
 
     async def _create_token(self):
         response = requests.post("https://api.heygen.com/v1/streaming.create_token", json={}, headers=self.headers)
-        response.raise_for_status()
+        self._raise_for_status_verbose(response)
         self.session_token = response.json()["data"]["token"]
         self.session_headers = {
             "accept": "application/json",
@@ -92,15 +96,23 @@ class AgoraHeygenRecorder:
             "namespace": "demo",
         }
         response = requests.post("https://api.heygen.com/v1/streaming.new", json=payload, headers=self.session_headers)
-        response.raise_for_status()
+        self._raise_for_status_verbose(response)
         data = response.json()["data"]
         self.session_id = data["session_id"]
         self.realtime_endpoint = data["realtime_endpoint"]
 
+    def _raise_for_status_verbose(self, response):
+        try:
+            response.raise_for_status()
+        except requests.HTTPError as e:
+            self.ten_env.log_error(f"HTTP error response: {response.text}")
+            raise e
+
     async def _start_session(self):
         payload = {"session_id": self.session_id}
+        self.ten_env.log_info(f"Starting session with payload: {payload}")
         response = requests.post("https://api.heygen.com/v1/streaming.start", json=payload, headers=self.session_headers)
-        response.raise_for_status()
+        self._raise_for_status_verbose(response)
 
     async def _stop_session(self):
         try:
