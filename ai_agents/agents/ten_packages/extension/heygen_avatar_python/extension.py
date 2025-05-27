@@ -4,7 +4,10 @@
 # See the LICENSE file for more information.
 #
 import asyncio
+import base64
 import traceback
+import wave
+
 from ten import (
     AudioFrame,
     VideoFrame,
@@ -38,9 +41,11 @@ class HeygenAvatarExtension(AsyncExtension):
         self.audio_queue = asyncio.Queue[bytes]()
         self.video_queue = asyncio.Queue()
         self.recorder: AgoraHeygenRecorder = None
+        self.ten_env: AsyncTenEnv = None
 
     async def on_init(self, ten_env: AsyncTenEnv) -> None:
         ten_env.log_debug("on_init")
+        self.ten_env = ten_env
 
     async def on_start(self, ten_env: AsyncTenEnv) -> None:
         ten_env.log_debug("on_start")
@@ -76,9 +81,46 @@ class HeygenAvatarExtension(AsyncExtension):
     async def _loop_input_audio_sender(self, _: AsyncTenEnv):
         while True:
             audio_frame = await self.input_audio_queue.get()
+            if self.recorder is not None and self.recorder.ws_connected():
+                # audio_frame = self.resample_chunk(audio_frame, 16000, 24000)
+                audio_chunks = self.get_audio_chunks()
+                for chunk in audio_chunks:
+                    # self._dump_audio_if_need(audio_frame)
+                    base64_audio_data = base64.b64encode(chunk).decode("utf-8")
+                    await self.recorder.send(base64_audio_data)
 
-            if self.recorder is not None:
-                await self.recorder.send(audio_frame)
+    def get_audio_chunks(self, filename="voicesample.wav", chunk_duration=1):
+        with wave.open(filename, "rb") as wav_file:
+            # Get wav file parameters
+            framerate = wav_file.getframerate()
+
+            # Calculate chunk size in frames
+            chunk_size = int(framerate * chunk_duration)
+
+            while True:
+                frames = wav_file.readframes(chunk_size)
+                if not frames:
+                    break
+                yield base64.b64encode(frames).decode("utf-8")
+
+    def resample_chunk(self, chunk: bytes, src_rate:int, target_rate: int) -> bytes:
+        import resampy
+        import numpy as np
+        # Convert PCM bytes to float32
+        pcm_np = np.frombuffer(chunk, dtype=np.int16).astype(np.float32) / 32768.0
+
+        # Resample
+        resampled = resampy.resample(pcm_np, src_rate, target_rate)
+
+        # Convert back to int16 PCM bytes
+        resampled_int16 = (resampled * 32768).astype(np.int16)
+        return resampled_int16.tobytes()
+
+    def _dump_audio_if_need(self, buf: bytearray) -> None:
+        with open(
+            "{}_{}.pcm".format("tts", self.config.agora_channel_name), "ab"
+        ) as dump_file:
+            dump_file.write(buf)
 
     async def on_stop(self, ten_env: AsyncTenEnv) -> None:
         ten_env.log_debug("on_stop")

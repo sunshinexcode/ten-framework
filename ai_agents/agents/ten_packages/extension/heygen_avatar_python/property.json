@@ -1,6 +1,6 @@
 {
     "agora_appid": "${env:AGORA_APP_ID}",
-    "agora_appcert": "${env:AGORA_APP_CERT}",
+    "agora_appcert": "${env:AGORA_APP_CERTIFICATE}",
     "agora_channel_name": "ten_agent_test",
     "agora_avatar_uid": 12345,
     "heygen_api_key": "${env:HEYGEN_API_KEY}"

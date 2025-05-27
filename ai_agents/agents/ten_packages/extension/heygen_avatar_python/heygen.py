@@ -124,6 +124,7 @@ class AgoraHeygenRecorder:
     async def _connect_websocket_loop(self):
         while self._should_reconnect:
             try:
+                self.ten_env.log_info("Connecting to WebSocket...")
                 async with websockets.connect(self.realtime_endpoint) as ws:
                     self.websocket = ws
                     await asyncio.Future()  # Wait forever unless cancelled
@@ -137,3 +138,6 @@ class AgoraHeygenRecorder:
         event_id = uuid.uuid4().hex
         await self.websocket.send(json.dumps({"type": "agent.audio_buffer_append", "audio": audio_base64, "event_id": event_id}))
         await self.websocket.send(json.dumps({"type": "agent.audio_buffer_commit", "audio": "", "event_id": event_id}))
+
+    def ws_connected(self):
+        return self.websocket is not None
