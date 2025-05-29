@@ -151,7 +151,8 @@
       "filteredByAddon": "アドオンでログをフィルター",
       "noAddons": "利用可能なアドオンがありません",
       "noMatchedAddons": "一致するアドオンがありません",
-      "noLogs": "表示するログがありません"
+      "noLogs": "表示するログがありません",
+      "cleanLogs": "ログをクリア"
     },
     "default": {
       "defaultLabelForAppRun": "アプリ実行のデフォルトラベル",
@@ -273,7 +274,8 @@
     "versionHistory": "バージョン履歴",
     "selectVersion": "バージョンを選択",
     "versionLatest": "最新",
-    "localAddonTip": "(ローカル)"
+    "localAddonTip": "(ローカル)",
+    "tags": "タグ"
   },
   "rtcInteraction": {
     "title": "RTCインタラクション"

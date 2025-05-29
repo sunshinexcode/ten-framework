@@ -5,7 +5,12 @@
 // Refer to the "LICENSE" file in the root directory for more information.
 //
 import * as React from "react";
-import { BlocksIcon, HardDriveDownloadIcon, CheckIcon } from "lucide-react";
+import {
+  BlocksIcon,
+  HardDriveDownloadIcon,
+  CheckIcon,
+  BrushCleaningIcon,
+} from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/ui/Button";
@@ -89,20 +94,34 @@ export const ExtensionTooltipContent = (props: {
           <Separator />
         </>
       )}
-      <div className="text-gray-500 dark:text-gray-400">
-        <div className="mb-1">{t("extensionStore.dependencies")}</div>
-        <ul className="flex flex-col gap-1 ml-2">
-          {item.dependencies?.map((dependency) => (
-            <li
-              key={dependency.name}
-              className="flex items-center w-full justify-between"
-            >
-              <span className="font-semibold">{dependency.name}</span>
-              <span className="ml-1">{dependency.version}</span>
-            </li>
-          ))}
-        </ul>
-      </div>
+      {item.dependencies?.length > 0 && (
+        <div className="text-gray-500 dark:text-gray-400">
+          <div className="mb-1">{t("extensionStore.dependencies")}</div>
+          <ul className="flex flex-col gap-1 ml-2">
+            {item.dependencies?.map((dependency) => (
+              <li
+                key={dependency.name}
+                className="flex items-center w-full justify-between"
+              >
+                <span className="font-semibold">{dependency.name}</span>
+                <span className="ml-1">{dependency.version}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {item.tags && item.tags.length > 0 && (
+        <>
+          <Separator />
+          <div className="text-gray-500 dark:text-gray-400">
+            <div className="mb-1">{t("extensionStore.tags")}</div>
+            <ExtensionEleTags
+              tags={item.tags}
+              // className="flex flex-wrap gap-1 ml-2"
+            />
+          </div>
+        </>
+      )}
     </div>
   );
 };
@@ -216,8 +235,17 @@ export const ExtensionDetails = (props: {
       actions: {
         onClose: () => {
           removeBackstageWidget(widgetId);
-          removeLogViewerHistory(widgetId);
         },
+        custom_actions: [
+          {
+            id: "app-start-log-clean",
+            label: t("popup.logViewer.cleanLogs"),
+            Icon: BrushCleaningIcon,
+            onClick: () => {
+              removeLogViewerHistory(widgetId);
+            },
+          },
+        ],
       },
     });
   };
@@ -352,6 +380,15 @@ export const ExtensionDetails = (props: {
           ))}
         </ul>
       </div>
+      {selectedVersionItemMemo &&
+        selectedVersionItemMemo.tags &&
+        selectedVersionItemMemo.tags.length > 0 && (
+          <>
+            <Separator />
+            <div className="font-semibold">{t("extensionStore.tags")}</div>
+            <ExtensionEleTags tags={selectedVersionItemMemo.tags} />
+          </>
+        )}
     </div>
   );
 };
@@ -384,6 +421,54 @@ const ExtensionEleSupports = (props: {
         <ExtensionEleBadge key={`${name}-${support.os}-${support.arch}`}>
           {support.os}/{support.arch}
         </ExtensionEleBadge>
+      ))}
+    </ul>
+  );
+};
+
+const ExtensionEleTags = (props: {
+  tags: IListTenCloudStorePackage["tags"];
+  maxItemsPerRow?: number;
+  className?: string;
+}) => {
+  const { tags, maxItemsPerRow = 6, className } = props;
+
+  const tagsMemo = React.useMemo(() => {
+    if (!tags || tags.length === 0) {
+      return { rows: [[]] as string[][], tagsSet: new Set<string>() };
+    }
+    return tags?.reduce(
+      (acc, tag) => {
+        const isTagExist = acc.tagsSet.has(tag);
+        if (isTagExist) {
+          return acc;
+        }
+        acc.tagsSet.add(tag);
+        const lastRow = acc.rows[acc.rows.length - 1];
+        if (lastRow.length < maxItemsPerRow) {
+          lastRow.push(tag);
+        } else {
+          acc.rows.push([tag]);
+        }
+        return acc;
+      },
+      { rows: [[]] as string[][], tagsSet: new Set<string>() }
+    );
+  }, [tags, maxItemsPerRow]);
+
+  return (
+    <ul className={cn("flex flex-col gap-1", className)}>
+      {tagsMemo.rows.map((row, rowIndex) => (
+        <li
+          key={rowIndex}
+          className={cn("flex gap-1 items-center justify-start", {
+            ["justify-between"]: row.length === maxItemsPerRow,
+          })}
+        >
+          {row.map((tag) => (
+            <ExtensionEleBadge key={tag}>{tag}</ExtensionEleBadge>
+          ))}
+        </li>
       ))}
     </ul>
   );
