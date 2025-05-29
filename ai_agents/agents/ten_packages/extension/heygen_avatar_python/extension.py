@@ -5,6 +5,7 @@
 #
 import asyncio
 import base64
+import io
 import traceback
 import wave
 
@@ -31,6 +32,7 @@ class HeygenAvatarConfig(BaseConfig):
     agora_channel_name: str = ""
     agora_avatar_uid: int = 0
     heygen_api_key: str = ""
+    audio_sample_rate: int = 16000
 
 
 class HeygenAvatarExtension(AsyncExtension):
@@ -82,39 +84,10 @@ class HeygenAvatarExtension(AsyncExtension):
         while True:
             audio_frame = await self.input_audio_queue.get()
             if self.recorder is not None and self.recorder.ws_connected():
-                # audio_frame = self.resample_chunk(audio_frame, 16000, 24000)
-                audio_chunks = self.get_audio_chunks()
-                for chunk in audio_chunks:
-                    # self._dump_audio_if_need(audio_frame)
-                    base64_audio_data = base64.b64encode(chunk).decode("utf-8")
-                    await self.recorder.send(base64_audio_data)
-
-    def get_audio_chunks(self, filename="voicesample.wav", chunk_duration=1):
-        with wave.open(filename, "rb") as wav_file:
-            # Get wav file parameters
-            framerate = wav_file.getframerate()
-
-            # Calculate chunk size in frames
-            chunk_size = int(framerate * chunk_duration)
-
-            while True:
-                frames = wav_file.readframes(chunk_size)
-                if not frames:
-                    break
-                yield base64.b64encode(frames).decode("utf-8")
-
-    def resample_chunk(self, chunk: bytes, src_rate:int, target_rate: int) -> bytes:
-        import resampy
-        import numpy as np
-        # Convert PCM bytes to float32
-        pcm_np = np.frombuffer(chunk, dtype=np.int16).astype(np.float32) / 32768.0
-
-        # Resample
-        resampled = resampy.resample(pcm_np, src_rate, target_rate)
-
-        # Convert back to int16 PCM bytes
-        resampled_int16 = (resampled * 32768).astype(np.int16)
-        return resampled_int16.tobytes()
+                # audio_frame_wav = self.pcm_to_wav_bytes(pcm_data=audio_frame, sample_rate=self.config.audio_sample_rate)
+                self._dump_audio_if_need(audio_frame)
+                base64_audio_data = base64.b64encode(audio_frame).decode("utf-8")
+                await self.recorder.send(base64_audio_data)
 
     def _dump_audio_if_need(self, buf: bytearray) -> None:
         with open(

@@ -311,14 +311,12 @@
           {
             "type": "extension",
             "name": "tts",
-            "addon": "fish_audio_tts",
+            "addon": "azure_tts",
             "extension_group": "tts",
             "property": {
-              "api_key": "${env:FISH_AUDIO_TTS_KEY}",
-              "model_id": "d8639b5cc95548f5afbcfe22d3ba5ce5",
-              "optimize_streaming_latency": true,
-              "request_timeout_seconds": 30,
-              "base_url": "https://api.fish.audio"
+              "azure_subscription_key": "${env:AZURE_TTS_KEY}",
+              "azure_subscription_region": "${env:AZURE_TTS_REGION}",
+              "azure_synthesis_voice_name": "en-US-AndrewMultilingualNeural"
             }
           },
           {
@@ -342,6 +340,19 @@
             "extension_group": "default",
             "property": {
               "api_key": "${env:WEATHERAPI_API_KEY|}"
+            }
+          },
+          {
+            "type": "extension",
+            "name": "avatar",
+            "addon": "heygen_avatar_python",
+            "extension_group": "default",
+            "property": {
+              "agora_appid": "${env:AGORA_APP_ID}",
+              "agora_appcert": "${env:AGORA_APP_CERTIFICATE}",
+              "agora_channel_name": "ten_agent_test",
+              "agora_avatar_uid": 12345,
+              "heygen_api_key": "${env:HEYGEN_API_KEY}"
             }
           }
         ],
@@ -444,29 +455,6 @@
             ]
           },
           {
-            "extension": "tts",
-            "cmd": [
-              {
-                "name": "flush",
-                "dest": [
-                  {
-                    "extension": "agora_rtc"
-                  }
-                ]
-              }
-            ],
-            "audio_frame": [
-              {
-                "name": "pcm_frame",
-                "dest": [
-                  {
-                    "extension": "agora_rtc"
-                  }
-                ]
-              }
-            ]
-          },
-          {
             "extension": "interrupt_detector",
             "cmd": [
               {
@@ -497,6 +485,29 @@
                 "dest": [
                   {
                     "extension": "llm"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "extension": "tts",
+            "cmd": [
+              {
+                "name": "flush",
+                "dest": [
+                  {
+                    "extension": "avatar"
+                  }
+                ]
+              }
+            ],
+            "audio_frame": [
+              {
+                "name": "pcm_frame",
+                "dest": [
+                  {
+                    "extension": "avatar"
                   }
                 ]
               }
