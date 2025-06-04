@@ -8,6 +8,7 @@ import base64
 import io
 import traceback
 import wave
+import numpy as np
 
 from ten import (
     AudioFrame,
@@ -32,7 +33,7 @@ class HeygenAvatarConfig(BaseConfig):
     agora_channel_name: str = ""
     agora_avatar_uid: int = 0
     heygen_api_key: str = ""
-    audio_sample_rate: int = 16000
+    audio_sample_rate: int = 48000
 
 
 class HeygenAvatarExtension(AsyncExtension):
@@ -84,10 +85,35 @@ class HeygenAvatarExtension(AsyncExtension):
         while True:
             audio_frame = await self.input_audio_queue.get()
             if self.recorder is not None and self.recorder.ws_connected():
-                # audio_frame_wav = self.pcm_to_wav_bytes(pcm_data=audio_frame, sample_rate=self.config.audio_sample_rate)
-                self._dump_audio_if_need(audio_frame)
-                base64_audio_data = base64.b64encode(audio_frame).decode("utf-8")
-                await self.recorder.send(base64_audio_data)
+                # Downsample the audio before sending
+                try:
+                    # Assume audio_frame contains PCM audio at the original sample rate
+                    original_rate = self.config.audio_sample_rate  # Use the configured sample rate
+                    target_rate = 24000
+                    decimation_factor = original_rate / target_rate
+
+                    audio_data = np.frombuffer(audio_frame, dtype=np.int16)
+                    if len(audio_data) == 0:
+                        continue
+
+                    # Downsample using nearest-neighbor approach
+                    indices = np.round(np.arange(0, len(audio_data), decimation_factor)).astype(int)
+                    indices = indices[indices < len(audio_data)]
+                    downsampled_audio = audio_data[indices]
+
+                    downsampled_frame = downsampled_audio.tobytes()
+
+                    # Dump the downsampled audio if needed
+                    self._dump_audio_if_need(downsampled_frame)
+
+                    # Encode and send the downsampled audio
+                    base64_audio_data = base64.b64encode(downsampled_frame).decode("utf-8")
+                    await self.recorder.send(base64_audio_data)
+
+                except Exception as e:
+                    # Log error but continue processing
+                    self.ten_env.log_error(f"Error processing audio frame: {e}")
+                    continue
 
     def _dump_audio_if_need(self, buf: bytearray) -> None:
         with open(
@@ -97,7 +123,7 @@ class HeygenAvatarExtension(AsyncExtension):
 
     async def on_stop(self, ten_env: AsyncTenEnv) -> None:
         ten_env.log_debug("on_stop")
-
+        await self.recorder.disconnect()
         # TODO: clean up resources
 
     async def on_deinit(self, ten_env: AsyncTenEnv) -> None:
