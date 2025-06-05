@@ -11,7 +11,7 @@ import {
   FolderTreeIcon,
   GitPullRequestCreateIcon,
   PackagePlusIcon,
-  // PinIcon,
+  PlayIcon,
 } from "lucide-react";
 
 import ContextMenu, {
@@ -19,7 +19,8 @@ import ContextMenu, {
   type IContextMenuItem,
 } from "@/flow/ContextMenu/ContextMenu";
 import { EGraphActions } from "@/types/graphs";
-
+import { useStorage } from "@/api/services/storage";
+import { IRunAppParams } from "@/types/apps";
 
 interface PaneContextMenuProps {
   visible: boolean;
@@ -30,6 +31,7 @@ interface PaneContextMenuProps {
   onOpenExistingGraph?: () => void;
   onGraphAct?: (type: EGraphActions) => void;
   onAppManager?: () => void;
+  onAppRun?: (app: IRunAppParams) => void;
   onClose: () => void;
 }
 
@@ -42,11 +44,12 @@ const PaneContextMenu: React.FC<PaneContextMenuProps> = ({
   onOpenExistingGraph,
   onGraphAct,
   onAppManager,
+  onAppRun, // Assuming you have a function to handle running the app
   onClose,
 }) => {
   const { t } = useTranslation();
-
-
+  const { data } = useStorage();
+  const { recent_run_apps = [] } = data || {};
 
   const items: IContextMenuItem[] = [
     {
@@ -95,6 +98,27 @@ const PaneContextMenu: React.FC<PaneContextMenuProps> = ({
         onAppManager?.();
       },
     },
+    ...recent_run_apps.map((app: IRunAppParams) => ({
+      _type: EContextMenuItemType.BUTTON,
+      label: `${t("action.runApp")} ${app.base_dir} ${app.script_name}`,
+      icon: <PlayIcon className="size-3" />,
+      disabled: !graphId,
+      onClick: () => {
+        onClose();
+        // Assuming you have a function to handle running the app
+        // runApp(app);
+        onAppRun?.({
+          script_name: app.script_name,
+          base_dir: app.base_dir,
+          // Assuming default value, adjust as needed
+          run_with_agent: app.run_with_agent,
+          // Assuming default value, adjust as needed
+          stderr_is_log: true,
+          // Assuming default value, adjust as needed
+          stdout_is_log: true,
+        });
+      },
+    })),
   ];
 
   return <ContextMenu visible={visible} x={x} y={y} items={items} />;
