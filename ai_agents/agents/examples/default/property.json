@@ -3,7 +3,7 @@
     "predefined_graphs": [
       {
         "name": "voice_assistant",
-        "auto_start": true,
+        "auto_start": false,
         "nodes": [
           {
             "type": "extension",
@@ -267,7 +267,7 @@
       },
       {
         "name": "voice_assistant_integrated_stt",
-        "auto_start": false,
+        "auto_start": true,
         "nodes": [
           {
             "type": "extension",
@@ -275,20 +275,20 @@
             "addon": "agora_rtc",
             "extension_group": "default",
             "property": {
-              "enable_agora_asr": true,
-              "agora_asr_vendor_name": "microsoft",
-              "channel": "ten_agent_test",
-              "subscribe_audio": true,
-              "publish_data": true,
-              "agora_asr_language": "en-US",
-              "remote_stream_id": 123,
               "agora_asr_vendor_region": "${env:AZURE_STT_REGION|}",
-              "publish_audio": true,
+              "remote_stream_id": 123,
+              "agora_asr_language": "en-US",
+              "subscribe_audio": true,
               "app_certificate": "${env:AGORA_APP_CERTIFICATE|}",
-              "agora_asr_session_control_file_path": "session_control.conf",
+              "publish_audio": false,
+              "stream_id": 1234,
+              "channel": "ten_agent_test",
               "app_id": "${env:AGORA_APP_ID}",
+              "agora_asr_session_control_file_path": "session_control.conf",
+              "publish_data": true,
               "agora_asr_vendor_key": "${env:AZURE_STT_KEY|}",
-              "stream_id": 1234
+              "agora_asr_vendor_name": "microsoft",
+              "enable_agora_asr": true
             }
           },
           {
@@ -348,11 +348,11 @@
             "addon": "heygen_avatar_python",
             "extension_group": "default",
             "property": {
+              "agora_channel_name": "ten_agent_test",
+              "heygen_api_key": "${env:HEYGEN_API_KEY}",
               "agora_appid": "${env:AGORA_APP_ID}",
               "agora_appcert": "${env:AGORA_APP_CERTIFICATE}",
-              "agora_channel_name": "ten_agent_test",
-              "agora_avatar_uid": 12345,
-              "heygen_api_key": "${env:HEYGEN_API_KEY}"
+              "agora_avatar_uid": 12345
             }
           }
         ],
