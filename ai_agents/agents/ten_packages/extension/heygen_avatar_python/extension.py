@@ -103,8 +103,8 @@ class HeygenAvatarExtension(AsyncExtension):
                     up = target_rate // gcd
                     down = original_rate // gcd
 
-                    self.ten_env.log_info(
-                        f"Resampling audio from {original_rate}Hz to {target_rate}Hz with up={up}, down={down}")
+                    # self.ten_env.log_info(
+                    #     f"Resampling audio from {original_rate}Hz to {target_rate}Hz with up={up}, down={down}")
 
                     # Apply resampling (polyphase filtering)
                     resampled = resample_poly(audio_data, up=up, down=down)
