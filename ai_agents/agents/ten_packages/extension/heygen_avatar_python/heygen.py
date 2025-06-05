@@ -38,8 +38,8 @@ class AgoraHeygenRecorder:
         self.websocket_task = None
         self._should_reconnect = True
 
-        # Timer to send agent.speak_end after 500 ms of no new agent.speak
-        self.speak_end_timer = None
+        self._speak_end_timer_task: asyncio.Task | None = None
+        self._speak_end_event = asyncio.Event()
 
     def _generate_token(self, uid, role):
         # if the app_cert is not required, return an empty string
@@ -148,35 +148,43 @@ class AgoraHeygenRecorder:
                 await asyncio.sleep(3)
 
     def _schedule_speak_end(self):
-        """Schedule sending `agent.speak_end` 500ms from now, cancelling any previous timer."""
-        if self.speak_end_timer is not None:
-            self.speak_end_timer.cancel()
+        """Restart debounce timer every time this is called."""
+        self._speak_end_event.set()  # signal to reset timer
 
-        def do_speak_end():
+        if self._speak_end_timer_task is None or self._speak_end_timer_task.done():
+            self._speak_end_event = asyncio.Event()
+            self._speak_end_timer_task = asyncio.create_task(self._debounced_speak_end())
+
+    async def _debounced_speak_end(self):
+        while True:
             try:
+                await asyncio.wait_for(self._speak_end_event.wait(), timeout=0.5)
+                # Reset the event and loop again
+                self._speak_end_event.clear()
+            except asyncio.TimeoutError:
+                # 500ms passed with no reset — now send
                 end_evt_id = str(uuid.uuid4())
-                self.websocket.send(
-                    json.dumps({"type": "agent.speak_end", "event_id": end_evt_id})
-                )
+                await self.websocket.send(json.dumps({
+                    "type": "agent.speak_end",
+                    "event_id": end_evt_id
+                }))
                 self.ten_env.log_info("Sent agent.speak_end.")
+                break  # Exit the task
             except Exception as e:
-                print(f"Error sending agent.speak_end: {e}")
-            finally:
-                self.speak_end_timer = None
-
-        self.speak_end_timer = threading.Timer(0.5, do_speak_end)
-        self.speak_end_timer.daemon = True
-        self.speak_end_timer.start()
+                print(f"Error in speak_end task: {e}")
+                break
 
     async def send(self, audio_base64: str):
         if self.websocket is None:
             raise RuntimeError("WebSocket is not connected.")
         event_id = uuid.uuid4().hex
-        await self.websocket.send(json.dumps({"type": "agent.speak", "audio": audio_base64, "event_id": event_id}))
-        #await self.websocket.send(json.dumps({"type": "agent.audio_buffer_append", "audio": audio_base64, "event_id": event_id}))
-        #await self.websocket.send(json.dumps({"type": "agent.audio_buffer_commit", "audio": "", "event_id": event_id}))
+        await self.websocket.send(json.dumps({
+            "type": "agent.speak",
+            "audio": audio_base64,
+            "event_id": event_id
+        }))
 
-        # Schedule agent.speak_end for 500ms from now
+        # Schedule agent.speak_end after a short delay
         self._schedule_speak_end()
 
     def ws_connected(self):

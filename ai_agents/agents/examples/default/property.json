@@ -348,11 +348,12 @@
             "addon": "heygen_avatar_python",
             "extension_group": "default",
             "property": {
-              "agora_channel_name": "ten_agent_test",
               "heygen_api_key": "${env:HEYGEN_API_KEY}",
-              "agora_appid": "${env:AGORA_APP_ID}",
+              "agora_avatar_uid": 12345,
+              "input_audio_sample_rate": 16000,
               "agora_appcert": "${env:AGORA_APP_CERTIFICATE}",
-              "agora_avatar_uid": 12345
+              "agora_appid": "${env:AGORA_APP_ID}",
+              "agora_channel_name": "ten_agent_test"
             }
           }
         ],

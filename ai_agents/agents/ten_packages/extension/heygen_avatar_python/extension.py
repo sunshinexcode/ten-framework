@@ -5,10 +5,9 @@
 #
 import asyncio
 import base64
-import io
 import traceback
-import wave
 import numpy as np
+from scipy.signal import resample_poly
 
 from ten import (
     AudioFrame,
@@ -33,7 +32,7 @@ class HeygenAvatarConfig(BaseConfig):
     agora_channel_name: str = ""
     agora_avatar_uid: int = 0
     heygen_api_key: str = ""
-    audio_sample_rate: int = 48000
+    input_audio_sample_rate: int = 48000
 
 
 class HeygenAvatarExtension(AsyncExtension):
@@ -88,26 +87,33 @@ class HeygenAvatarExtension(AsyncExtension):
                 # Downsample the audio before sending
                 try:
                     # Assume audio_frame contains PCM audio at the original sample rate
-                    original_rate = self.config.audio_sample_rate  # Use the configured sample rate
+                    original_rate = self.config.input_audio_sample_rate  # Use the configured sample rate
                     target_rate = 24000
-                    decimation_factor = original_rate / target_rate
+
+                    # Dump if needed
+                    self._dump_audio_if_need(audio_frame)
 
                     audio_data = np.frombuffer(audio_frame, dtype=np.int16)
                     if len(audio_data) == 0:
                         continue
 
-                    # Downsample using nearest-neighbor approach
-                    indices = np.round(np.arange(0, len(audio_data), decimation_factor)).astype(int)
-                    indices = indices[indices < len(audio_data)]
-                    downsampled_audio = audio_data[indices]
 
-                    downsampled_frame = downsampled_audio.tobytes()
+                    # Calculate up/down factors for rational resampling
+                    gcd = np.gcd(original_rate, target_rate)
+                    up = target_rate // gcd
+                    down = original_rate // gcd
 
-                    # Dump the downsampled audio if needed
-                    self._dump_audio_if_need(downsampled_frame)
+                    self.ten_env.log_info(
+                        f"Resampling audio from {original_rate}Hz to {target_rate}Hz with up={up}, down={down}")
 
-                    # Encode and send the downsampled audio
-                    base64_audio_data = base64.b64encode(downsampled_frame).decode("utf-8")
+                    # Apply resampling (polyphase filtering)
+                    resampled = resample_poly(audio_data, up=up, down=down)
+                    resampled = np.clip(resampled, -32768, 32767).astype(np.int16)
+                    resampled_bytes = resampled.tobytes()
+
+
+                    # Encode and send
+                    base64_audio_data = base64.b64encode(resampled_bytes).decode("utf-8")
                     await self.recorder.send(base64_audio_data)
 
                 except Exception as e:
