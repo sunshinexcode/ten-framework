@@ -1,5 +1,6 @@
 import base64
 import json
+import os
 import uuid
 import asyncio
 import requests
@@ -13,6 +14,7 @@ from ten import AsyncTenEnv
 
 
 class AgoraHeygenRecorder:
+    SESSION_CACHE_PATH = "/tmp/heygen_session_id.txt"
     def __init__(self, app_id: str, app_cert: str, heygen_api_key: str, channel_name: str, avatar_uid: int, ten_env: AsyncTenEnv):
         if not app_id or not heygen_api_key:
             raise ValueError("AGORA_APP_ID, AGORA_APP_CERT, and HEYGEN_API_KEY must be provided.")
@@ -57,10 +59,37 @@ class AgoraHeygenRecorder:
             privilege_expired_ts,
         )
 
+    def _load_cached_session_id(self):
+        if os.path.exists(self.SESSION_CACHE_PATH):
+            with open(self.SESSION_CACHE_PATH, "r") as f:
+                return f.read().strip()
+        return None
+
+    def _save_session_id(self, session_id: str):
+        with open(self.SESSION_CACHE_PATH, "w") as f:
+            f.write(session_id)
+
+    def _clear_session_id_cache(self):
+        if os.path.exists(self.SESSION_CACHE_PATH):
+            os.remove(self.SESSION_CACHE_PATH)
+
     async def connect(self):
         await self._create_token()
+
+        # Check and stop old session if needed
+        old_session_id = self._load_cached_session_id()
+        if old_session_id:
+            try:
+                self.ten_env.log_info(f"Found previous session id: {old_session_id}, attempting to stop it.")
+                await self._stop_session(old_session_id)
+                self.ten_env.log_info("Previous session stopped.")
+                self._clear_session_id_cache()
+            except Exception as e:
+                self.ten_env.log_error(f"Failed to stop old session: {e}")
+
         await self._create_session()
         await self._start_session()
+        self._save_session_id(self.session_id)
         self.websocket_task = asyncio.create_task(self._connect_websocket_loop())
 
     async def disconnect(self):
@@ -71,7 +100,7 @@ class AgoraHeygenRecorder:
                 await self.websocket_task
             except asyncio.CancelledError:
                 pass
-        await self._stop_session()
+        await self._stop_session(self.session_id)
 
     async def _create_token(self):
         response = requests.post("https://api.heygen.com/v1/streaming.create_token", json={}, headers=self.headers)
@@ -125,14 +154,16 @@ class AgoraHeygenRecorder:
         response = requests.post("https://api.heygen.com/v1/streaming.start", json=payload, headers=self.session_headers)
         self._raise_for_status_verbose(response)
 
-    async def _stop_session(self):
+    async def _stop_session(self, session_id: str):
         try:
-            payload = {"session_id": self.session_id}
+            payload = {"session_id": session_id}
             self.ten_env.log_info("_stop_session with details:")
             self.ten_env.log_info(f"URL: https://api.heygen.com/v1/streaming.stop")
-            self.ten_env.log_info(f"Headers: {json.dumps(self.session_headers, indent=2)}")
+            self.ten_env.log_info(f"Headers: {json.dumps(self.headers, indent=2)}")
             self.ten_env.log_info(f"Payload: {json.dumps(payload, indent=2)}")
-            requests.post("https://api.heygen.com/v1/streaming.stop", json=payload, headers=self.session_headers)
+            response = requests.post("https://api.heygen.com/v1/streaming.stop", json=payload, headers=self.headers)
+            self._raise_for_status_verbose(response)
+            self._clear_session_id_cache()
         except Exception as e:
             print(f"Failed to stop session: {e}")
 
