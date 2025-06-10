@@ -13,8 +13,8 @@ import {
   MOBILE_ACTIVE_TAB_MAP,
   EMobileActiveTab,
   isEditModeOn,
-  useGraphs,
 } from "@/common";
+import { useRtcControl } from "@/common/hooks";
 import { toast } from "sonner";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
@@ -28,6 +28,7 @@ let intervalId: NodeJS.Timeout | null = null;
 export default function Action(props: { className?: string }) {
   const { className } = props;
   const dispatch = useAppDispatch();
+  const { initRTC, destroyRTC } = useRtcControl();
   const agentConnected = useAppSelector((state) => state.global.agentConnected);
   const channel = useAppSelector((state) => state.global.options.channel);
   const userId = useAppSelector((state) => state.global.options.userId);
@@ -63,6 +64,7 @@ export default function Action(props: { className?: string }) {
     if (agentConnected) {
       await apiStopService(channel);
       dispatch(setAgentConnected(false));
+      await destroyRTC(); // 🔁 DESTROY RTC
       toast.success("Agent disconnected");
       stopPing();
     } else {
@@ -74,6 +76,7 @@ export default function Action(props: { className?: string }) {
         setLoading(false);
         return;
       }
+      await initRTC(); // 🔁 INIT RTC
 
       const res = await apiStartService({
         channel,
