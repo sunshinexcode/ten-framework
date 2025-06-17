@@ -3,8 +3,8 @@
 import * as React from "react"
 import { cn } from "@/lib/utils"
 import { ICameraVideoTrack, ILocalVideoTrack, IMicrophoneAudioTrack } from "agora-rtc-sdk-ng"
-import { useAppSelector, useAppDispatch, VOICE_OPTIONS, VideoSourceType, useIsCompactLayout } from "@/common"
-import { ITextItem, EMessageType, IChatItem } from "@/types"
+import { useAppSelector, useAppDispatch, VideoSourceType, useIsCompactLayout } from "@/common"
+import { IChatItem } from "@/types"
 import { rtcManager, IUserTracks, IRtcUser } from "@/manager"
 import {
   setRoomConnected,
@@ -12,7 +12,6 @@ import {
   setVoiceType,
   setOptions,
 } from "@/store/reducers/global"
-import AgentVoicePresetSelect from "@/components/Agent/VoicePresetSelect"
 import AgentView from "@/components/Agent/View"
 import Avatar from "@/components/Agent/AvatarTrulience"
 import MicrophoneBlock from "@/components/Agent/Microphone"
@@ -43,55 +42,67 @@ export default function RTCCard(props: { className?: string }) {
     ssr: false,
   });
 
-  React.useEffect(() => {
-    if (!options.channel) {
-      return
-    }
-    if (hasInit) {
-      return
-    }
+  // React.useEffect(() => {
+  //   if (!options.channel) {
+  //     return
+  //   }
+  //   if (hasInit) {
+  //     return
+  //   }
 
-    init()
+  //   init()
+
+  //   return () => {
+  //     if (hasInit) {
+  //       destory()
+  //     }
+  //   }
+  // }, [options.channel])
+
+  React.useEffect(() => {
+    rtcManager.on("remoteUserChanged", onRemoteUserChanged);
+    rtcManager.on("localTracksChanged", onLocalTracksChanged);
+    rtcManager.on("textChanged", onTextChanged);
 
     return () => {
-      if (hasInit) {
-        destory()
-      }
-    }
-  }, [options.channel])
+      rtcManager.off("remoteUserChanged", onRemoteUserChanged);
+      rtcManager.off("localTracksChanged", onLocalTracksChanged);
+      rtcManager.off("textChanged", onTextChanged);
+    };
+  }, []);
 
-  const init = async () => {
-    console.log("[rtc] init")
-    rtcManager.on("localTracksChanged", onLocalTracksChanged)
-    rtcManager.on("textChanged", onTextChanged)
-    rtcManager.on("remoteUserChanged", onRemoteUserChanged)
-    await rtcManager.createCameraTracks()
-    await rtcManager.createMicrophoneAudioTrack()
-    await rtcManager.join({
-      channel,
-      userId,
-    })
-    dispatch(
-      setOptions({
-        ...options,
-        appId: rtcManager.appId ?? "",
-        token: rtcManager.token ?? "",
-      }),
-    )
-    await rtcManager.publish()
-    dispatch(setRoomConnected(true))
-    hasInit = true
-  }
+  // const init = async () => {
+  //   console.log("[rtc] init")
+  //   rtcManager.on("localTracksChanged", onLocalTracksChanged)
+  //   rtcManager.on("textChanged", onTextChanged)
+  //   rtcManager.on("remoteUserChanged", onRemoteUserChanged)
+  //   await rtcManager.createCameraTracks()
+  //   await rtcManager.createMicrophoneAudioTrack()
+  //   await rtcManager.join({
+  //     channel,
+  //     userId,
+  //   })
+  //   dispatch(
+  //     setOptions({
+  //       ...options,
+  //       appId: rtcManager.appId ?? "",
+  //       token: rtcManager.token ?? "",
+  //     }),
+  //   )
+  //   await rtcManager.publish()
+  //   dispatch(setRoomConnected(true))
+  //   hasInit = true
+  // }
 
-  const destory = async () => {
-    console.log("[rtc] destory")
-    rtcManager.off("textChanged", onTextChanged)
-    rtcManager.off("localTracksChanged", onLocalTracksChanged)
-    rtcManager.off("remoteUserChanged", onRemoteUserChanged)
-    await rtcManager.destroy()
-    dispatch(setRoomConnected(false))
-    hasInit = false
-  }
+  // const destory = async () => {
+  //   console.log("[rtc] destory")
+  //   rtcManager.off("textChanged", onTextChanged)
+  //   rtcManager.off("localTracksChanged", onLocalTracksChanged)
+  //   rtcManager.off("remoteUserChanged", onRemoteUserChanged)
+  //   await rtcManager.destroy()
+  //   dispatch(setRoomConnected(false))
+  //   hasInit = false
+  // }
 
   const onRemoteUserChanged = (user: IRtcUser) => {
     console.log("[rtc] onRemoteUserChanged", user)

@@ -1,13 +1,16 @@
 "use client";
 
 import { IMicrophoneAudioTrack, IRemoteAudioTrack } from "agora-rtc-sdk-ng";
-import { deepMerge, normalizeFrequencies } from "./utils";
+import { normalizeFrequencies } from "./utils";
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import type { AppDispatch, AppStore, RootState } from "../store";
 import { useDispatch, useSelector, useStore } from "react-redux";
 import { Node, AddonDef, Graph } from "@/common/graph";
 import { initializeGraphData, updateGraph } from "@/store/reducers/global";
 import { moduleRegistry, ModuleRegistry, toolModuleRegistry } from "@/common/moduleConfig";
+// hooks/useRtcControl.ts
+import { rtcManager } from "@/manager";
+import { setOptions, setRoomConnected } from "@/store/reducers/global";
 // import { Grid } from "antd"
 
 // const { useBreakpoint } = Grid;
@@ -215,5 +218,45 @@ const useGraphs = () => {
     installedAndRegisteredToolModules,
   }
 }
+
+let hasInit = false;
+
+export const useRtcControl = () => {
+  const dispatch = useAppDispatch();
+  const options = useAppSelector((state) => state.global.options);
+
+  const initRTC = async () => {
+    if (hasInit) return;
+
+    await rtcManager.createCameraTracks();
+    await rtcManager.createMicrophoneAudioTrack();
+    await rtcManager.join({
+      channel: options.channel,
+      userId: options.userId,
+    });
+
+    dispatch(setOptions({
+      ...options,
+      appId: rtcManager.appId ?? "",
+      token: rtcManager.token ?? "",
+    }));
+
+    await rtcManager.publish();
+    dispatch(setRoomConnected(true));
+    hasInit = true;
+  };
+
+  const destroyRTC = async () => {
+    if (!hasInit) return;
+
+    await rtcManager.destroy();
+    dispatch(setRoomConnected(false));
+    hasInit = false;
+  };
+
+  return { initRTC, destroyRTC };
+};
+
+
 
 export { useGraphs }
