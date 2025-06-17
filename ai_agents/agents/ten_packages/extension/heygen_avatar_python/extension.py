@@ -84,40 +84,40 @@ class HeygenAvatarExtension(AsyncExtension):
         while True:
             audio_frame = await self.input_audio_queue.get()
             if self.recorder is not None and self.recorder.ws_connected():
-                # Downsample the audio before sending
                 try:
-                    # Assume audio_frame contains PCM audio at the original sample rate
-                    original_rate = self.config.input_audio_sample_rate  # Use the configured sample rate
+                    original_rate = self.config.input_audio_sample_rate
                     target_rate = 24000
-
-                    # Dump if needed
-                    self._dump_audio_if_need(audio_frame)
 
                     audio_data = np.frombuffer(audio_frame, dtype=np.int16)
                     if len(audio_data) == 0:
                         continue
 
+                    # Skip resampling if rates are the same
+                    if original_rate == target_rate:
+                        resampled_frame = audio_frame
+                    else:
+                        # Calculate resampling ratio
+                        resample_ratio = target_rate / original_rate
 
-                    # Calculate up/down factors for rational resampling
-                    gcd = np.gcd(original_rate, target_rate)
-                    up = target_rate // gcd
-                    down = original_rate // gcd
+                        if resample_ratio > 1:
+                            # Upsampling: create more samples
+                            new_length = int(len(audio_data) * resample_ratio)
+                            old_indices = np.linspace(0, len(audio_data) - 1, new_length)
+                            resampled_audio = audio_data[np.round(old_indices).astype(int)]
+                        else:
+                            # Downsampling: select fewer samples
+                            step = 1 / resample_ratio
+                            indices = np.round(np.arange(0, len(audio_data), step)).astype(int)
+                            indices = indices[indices < len(audio_data)]
+                            resampled_audio = audio_data[indices]
 
-                    # self.ten_env.log_info(
-                    #     f"Resampling audio from {original_rate}Hz to {target_rate}Hz with up={up}, down={down}")
-
-                    # Apply resampling (polyphase filtering)
-                    resampled = resample_poly(audio_data, up=up, down=down)
-                    resampled = np.clip(resampled, -32768, 32767).astype(np.int16)
-                    resampled_bytes = resampled.tobytes()
-
+                        resampled_frame = resampled_audio.tobytes()
 
                     # Encode and send
-                    base64_audio_data = base64.b64encode(resampled_bytes).decode("utf-8")
+                    base64_audio_data = base64.b64encode(resampled_frame).decode("utf-8")
                     await self.recorder.send(base64_audio_data)
 
                 except Exception as e:
-                    # Log error but continue processing
                     self.ten_env.log_error(f"Error processing audio frame: {e}")
                     continue
 
@@ -128,7 +128,7 @@ class HeygenAvatarExtension(AsyncExtension):
             dump_file.write(buf)
 
     async def on_stop(self, ten_env: AsyncTenEnv) -> None:
-        ten_env.log_debug("on_stop")
+        ten_env.log_error("BBBBB on_stop")
         await self.recorder.disconnect()
         # TODO: clean up resources
 
