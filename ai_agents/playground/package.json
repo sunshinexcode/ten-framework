@@ -6,9 +6,10 @@
     "node": ">=20"
   },
   "scripts": {
-    "dev": "next dev --turbopack",
+    "dev": "next dev --turbopack -p 3050",
     "build": "next build",
-    "start": "next start",
+    "start": "next start -p 3030",
+    "pm2-start": "pm2 start npm --name \"ten-ui2\" -- start",
     "lint": "next lint",
     "proto": "pbjs -t json-module -w commonjs -o src/protobuf/SttMessage.js src/protobuf/SttMessage.proto"
   },

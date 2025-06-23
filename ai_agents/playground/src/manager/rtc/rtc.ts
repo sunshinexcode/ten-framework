@@ -33,6 +33,8 @@ export class RtcManager extends AGEventEmitter<RtcEvents> {
     this._joined = false;
     this.localTracks = {};
     this.client = AgoraRTC.createClient({ mode: "rtc", codec: "vp8" });
+    (AgoraRTC as any).setParameter("ENABLE_AUT_CC", true);
+    (AgoraRTC as any).setParameter("ENABLE_AUT_FEEDBACK", true);
     this._listenRtcEvents();
   }
 
