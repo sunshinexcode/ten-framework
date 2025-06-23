@@ -3,6 +3,9 @@ from ten_ai_base.transcription import UserTranscription
 from ten_runtime import (
     AsyncTenEnv,
     AudioFrame,
+    Cmd,
+    StatusCode,
+    CmdResult,
 )
 
 import asyncio
@@ -40,6 +43,14 @@ class DeepgramASRExtension(AsyncASRBaseExtension):
 
     async def on_init(self, ten_env: AsyncTenEnv) -> None:
         ten_env.log_info("DeepgramASRExtension on_init")
+
+    async def on_cmd(self, ten_env: AsyncTenEnv, cmd: Cmd) -> None:
+        cmd_json = cmd.to_json()
+        ten_env.log_info(f"on_cmd json: {cmd_json}")
+
+        cmd_result = CmdResult.create(StatusCode.OK, cmd)
+        cmd_result.set_property_string("detail", "success")
+        await ten_env.return_result(cmd_result)
 
     async def start_connection(self) -> None:
         self.ten_env.log_info("start and listen deepgram")
