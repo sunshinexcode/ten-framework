@@ -77,6 +77,9 @@ class DeepgramASRExtension(AsyncASRBaseExtension):
         if not sentence:
             return
 
+        start_ms = result.start * 1000  # convert seconds to milliseconds
+        duration_ms = result.duration * 1000  # convert seconds to milliseconds
+
         is_final = result.is_final
         self.ten_env.log_info(
             f"deepgram got sentence: [{sentence}], is_final: {is_final}"
@@ -85,8 +88,8 @@ class DeepgramASRExtension(AsyncASRBaseExtension):
         transcription = UserTranscription(
             text=sentence,
             final=is_final,
-            start_ms=0,
-            duration_ms=100,
+            start_ms=start_ms,
+            duration_ms=duration_ms,
             language=self.config.language,
             words=[],
         )
@@ -152,3 +155,6 @@ class DeepgramASRExtension(AsyncASRBaseExtension):
 
     async def drain(self) -> None:
         pass
+
+    def input_audio_sample_rate(self) -> int:
+        return self.config.sample_rate
