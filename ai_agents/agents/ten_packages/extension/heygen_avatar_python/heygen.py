@@ -344,9 +344,9 @@ class AgoraHeygenRecorder:
         self._speak_end_timer_task = asyncio.create_task(self._debounced_speak_end())
 
     async def _debounced_speak_end(self):
-        """Wait 0.5 seconds, then send speak_end if not cancelled"""
+        """Wait 1.0 seconds, then send speak_end if not cancelled"""
         try:
-            await asyncio.sleep(0.5)
+            await asyncio.sleep(1.0)
             # If we reach here, 500ms passed without being cancelled
             if self.websocket is not None:
                 end_evt_id = str(uuid.uuid4())
@@ -364,14 +364,35 @@ class AgoraHeygenRecorder:
     async def send(self, audio_base64: str):
         if self.websocket is None:
             raise RuntimeError("WebSocket is not connected.")
+        
+        # Check if there's NO speak_end scheduled yet (meaning active speech without speak_end timer)
+        no_speak_end_scheduled = (self._speak_end_timer_task is None or 
+                                 self._speak_end_timer_task.done())
+        
+        # If there's no speak_end scheduled yet and new audio arrives, send interrupt
+        if no_speak_end_scheduled:
+            try:
+                self.ten_env.log_info("Interrupting active speech (no speak_end scheduled) before sending new TTS")
+                await self.interrupt()
+            except Exception as e:
+                self.ten_env.log_error(f"Failed to interrupt active speech: {e}")
+                # Continue anyway to send the new audio
+        else:
+            # There's already a speak_end scheduled, so cancel it
+            self.ten_env.log_info("Cancelling existing speak_end timer for new TTS")
+            self._speak_end_timer_task.cancel()
+        
+        # Send the new audio
         event_id = uuid.uuid4().hex
         await self.websocket.send(json.dumps({
             "type": "agent.speak",
             "audio": audio_base64,
             "event_id": event_id
         }))
+        
+        self.ten_env.log_info(f"Sent new audio with event_id: {event_id}")
 
-        # Schedule agent.speak_end after a short delay
+        # Schedule agent.speak_end after a short delay for the new audio
         self._schedule_speak_end()
 
     def ws_connected(self):
