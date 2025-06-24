@@ -14,6 +14,7 @@ from ten_runtime import (
     AudioFrame,
     Cmd,
     CmdResult,
+    Data,
     StatusCode,
 )
 
@@ -67,6 +68,18 @@ class ExtensionTesterDeepgram(AsyncExtensionTester):
         self.sender_task = asyncio.create_task(self.audio_sender(ten_env))
 
 
+    async def on_data(self, ten_env: AsyncTenEnvTester, data: Data) -> None:
+        json_data, _ = data.get_property_to_json("asr_result")
+
+        ten_env.log_info(
+            f"on_data json: {json_data}"
+        )
+
+        # assert stream_id == 123
+        # assert user_id == "123"
+
+        ten_env.stop_test()
+
     async def on_stop(self, ten_env: AsyncTenEnvTester) -> None:
         self.sender_task.cancel()
         try:
@@ -79,11 +92,11 @@ def test_basic():
     tester.set_test_mode_single("deepgram_asr_python")
     tester.run()
 
-    # tester = ExtensionTesterDeepgram()
-    # tester.set_test_mode_single("deepgram_asr_python", json.dumps({
-    #     "api_key": os.getenv("DEEPGRAM_API_KEY", ""),
-    #     "language": "en-US",
-    #     "model": "nova-2",
-    #     "sample_rate": 16000
-    # }))
-    # tester.run()
+    tester = ExtensionTesterDeepgram()
+    tester.set_test_mode_single("deepgram_asr_python", json.dumps({
+        "api_key": os.getenv("DEEPGRAM_API_KEY", ""),
+        "language": "en-US",
+        "model": "nova-2",
+        "sample_rate": 16000
+    }))
+    tester.run()

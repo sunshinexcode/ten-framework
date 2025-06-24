@@ -52,6 +52,47 @@ class DeepgramASRExtension(AsyncASRBaseExtension):
         cmd_result.set_property_string("detail", "success")
         await ten_env.return_result(cmd_result)
 
+    async def _handle_reconnect(self):
+        await asyncio.sleep(0.2)
+        await self.start_connection()
+
+
+    def _on_close(self, *args, **kwargs):
+        self.ten_env.log_info(f"deepgram event callback on_close: {args}, {kwargs}")
+        self.connected = False
+        if not self.stopped:
+            self.ten_env.log_warn("Deepgram connection closed unexpectedly. Reconnecting...")
+            asyncio.create_task(self._handle_reconnect())
+
+    async def _on_open(self, _, event):
+        self.ten_env.log_info(f"deepgram event callback on_open: {event}")
+        self.connected = True
+
+    async def _on_error(self, _, error):
+        self.ten_env.log_error(f"deepgram event callback on_error: {error}")
+
+    async def _on_message(self, _, result):
+        sentence = result.channel.alternatives[0].transcript
+
+        if not sentence:
+            return
+
+        is_final = result.is_final
+        self.ten_env.log_info(
+            f"deepgram got sentence: [{sentence}], is_final: {is_final}"
+        )
+
+        transcription = UserTranscription(
+            text=sentence,
+            final=is_final,
+            start_ms=0,
+            duration_ms=100,
+            language=self.config.language,
+            words=[],
+        )
+        await self.send_asr_transcription(transcription)
+
+
     async def start_connection(self) -> None:
         self.ten_env.log_info("start and listen deepgram")
 
@@ -63,57 +104,18 @@ class DeepgramASRExtension(AsyncASRBaseExtension):
                 self.ten_env.log_error("get property api_key")
                 return
 
+        await self.stop_connection()
+
         self.client = AsyncListenWebSocketClient(
             config=DeepgramClientOptions(
                 api_key=self.config.api_key, options={"keepalive": "true"}
             )
         )
 
-        async def on_open(_, event):
-            self.ten_env.log_info(f"deepgram event callback on_open: {event}")
-            self.connected = True
-
-        async def on_close(_, event):
-            self.ten_env.log_info(f"deepgram event callback on_close: {event}")
-            self.connected = False
-            if not self.stopped:
-                self.ten_env.log_warn(
-                    "Deepgram connection closed unexpectedly. Reconnecting..."
-                )
-                await asyncio.sleep(0.2)
-                self.loop.create_task(self.start_connection())
-
-        async def on_message(_, result):
-            sentence = result.channel.alternatives[0].transcript
-
-            if len(sentence) == 0:
-                return
-
-            is_final = result.is_final
-            self.ten_env.log_info(
-                f"deepgram got sentence: [{sentence}], is_final: {is_final}"
-            )
-
-            # await self._send_text(
-            #     text=sentence, is_final=is_final, stream_id=self.stream_id
-            # )
-            transcription = UserTranscription(
-                text=sentence,
-                final=is_final,
-                start_ms=0,
-                duration_ms=100,
-                language=self.config.language,
-                words=[],
-            )
-            await self.send_asr_transcription(transcription)
-
-        async def on_error(_, error):
-            self.ten_env.log_error(f"deepgram event callback on_error: {error}")
-
-        self.client.on(LiveTranscriptionEvents.Open, on_open)
-        self.client.on(LiveTranscriptionEvents.Close, on_close)
-        self.client.on(LiveTranscriptionEvents.Transcript, on_message)
-        self.client.on(LiveTranscriptionEvents.Error, on_error)
+        self.client.on(LiveTranscriptionEvents.Open, self._on_open)
+        self.client.on(LiveTranscriptionEvents.Close, self._on_close)
+        self.client.on(LiveTranscriptionEvents.Transcript, self._on_message)
+        self.client.on(LiveTranscriptionEvents.Error, self._on_error)
 
         options = LiveOptions(
             language=self.config.language,
@@ -130,8 +132,7 @@ class DeepgramASRExtension(AsyncASRBaseExtension):
         result = await self.client.start(options)
         if not result:
             self.ten_env.log_error("failed to connect to deepgram")
-            await asyncio.sleep(0.2)
-            self.loop.create_task(self.start_connection())
+            await self._handle_reconnect()
         else:
             self.ten_env.log_info("successfully connected to deepgram")
 
