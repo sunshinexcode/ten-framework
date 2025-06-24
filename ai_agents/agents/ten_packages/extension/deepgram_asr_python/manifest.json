@@ -7,6 +7,9 @@
       "type": "system",
       "name": "ten_runtime_python",
       "version": "0.10"
+    },
+    {
+      "path": "/tmp/ten_ai_base"
     }
   ],
   "api": {

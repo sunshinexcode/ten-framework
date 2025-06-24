@@ -45,7 +45,7 @@ class DeepgramASRExtension(AsyncASRBaseExtension):
         ten_env.log_info("DeepgramASRExtension on_init")
 
     async def on_cmd(self, ten_env: AsyncTenEnv, cmd: Cmd) -> None:
-        cmd_json = cmd.to_json()
+        cmd_json, _ = cmd.get_property_to_json()
         ten_env.log_info(f"on_cmd json: {cmd_json}")
 
         cmd_result = CmdResult.create(StatusCode.OK, cmd)
@@ -142,12 +142,12 @@ class DeepgramASRExtension(AsyncASRBaseExtension):
             self.connected = False
             self.ten_env.log_info("deepgram connection stopped")
 
-    async def send_audio_frame(self, frame: AudioFrame) -> None:
+    async def send_audio(self, frame: AudioFrame) -> None:
         frame_buf = frame.get_buf()
         return await self.client.send(frame_buf)
 
-    async def is_connected(self) -> bool:
-        return self.connected
+    def is_connected(self) -> bool:
+        return self.connected and self.client is not None
 
     async def drain(self) -> None:
         pass
