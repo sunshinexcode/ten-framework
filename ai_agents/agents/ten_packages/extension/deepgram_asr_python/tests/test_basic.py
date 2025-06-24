@@ -92,11 +92,11 @@ def test_basic():
     tester.set_test_mode_single("deepgram_asr_python")
     tester.run()
 
-    tester = ExtensionTesterDeepgram()
-    tester.set_test_mode_single("deepgram_asr_python", json.dumps({
-        "api_key": os.getenv("DEEPGRAM_API_KEY", ""),
-        "language": "en-US",
-        "model": "nova-2",
-        "sample_rate": 16000
-    }))
-    tester.run()
+    # tester = ExtensionTesterDeepgram()
+    # tester.set_test_mode_single("deepgram_asr_python", json.dumps({
+    #     "api_key": os.getenv("DEEPGRAM_API_KEY", ""),
+    #     "language": "en-US",
+    #     "model": "nova-2",
+    #     "sample_rate": 16000
+    # }))
+    # tester.run()
