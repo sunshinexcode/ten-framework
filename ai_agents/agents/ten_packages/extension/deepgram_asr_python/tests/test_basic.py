@@ -69,16 +69,20 @@ class ExtensionTesterDeepgram(AsyncExtensionTester):
 
 
     async def on_data(self, ten_env: AsyncTenEnvTester, data: Data) -> None:
-        json_data, _ = data.get_property_to_json("asr_result")
+        name = data.get_name()
 
-        ten_env.log_info(
-            f"on_data json: {json_data}"
-        )
+        if name == "asr_result":
+            json_str, _ = data.get_property_to_json(None)
 
-        # assert stream_id == 123
-        # assert user_id == "123"
+            json_data = json.loads(json_str)
 
-        ten_env.stop_test()
+            language = json_data.get("language", "")
+            id = json_data.get("id", "")
+
+            assert language == "en-US"
+            assert id == "user.transcription"
+
+            ten_env.stop_test()
 
     async def on_stop(self, ten_env: AsyncTenEnvTester) -> None:
         self.sender_task.cancel()
