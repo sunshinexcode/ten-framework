@@ -32,10 +32,9 @@ class ExtensionTesterBasic(AsyncExtensionTester):
         new_cmd = Cmd.create("hello_world")
 
         print("send hello_world")
-        result, _ = await ten_env.send_cmd(
-            new_cmd
-        )
+        result, _ = await ten_env.send_cmd(new_cmd)
         self.check_hello(ten_env, result)
+
 
 class ExtensionTesterDeepgram(AsyncExtensionTester):
 
@@ -67,7 +66,6 @@ class ExtensionTesterDeepgram(AsyncExtensionTester):
         # Create a task to read pcm file and send to extension
         self.sender_task = asyncio.create_task(self.audio_sender(ten_env))
 
-
     async def on_data(self, ten_env: AsyncTenEnvTester, data: Data) -> None:
         name = data.get_name()
 
@@ -90,6 +88,7 @@ class ExtensionTesterDeepgram(AsyncExtensionTester):
             await self.sender_task
         except asyncio.CancelledError:
             pass
+
 
 def test_basic():
     tester = ExtensionTesterBasic()

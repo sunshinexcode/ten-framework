@@ -20,6 +20,7 @@ from dataclasses import dataclass
 
 from ten_ai_base.config import BaseConfig
 
+
 @dataclass
 class DeepgramASRConfig(BaseConfig):
     api_key: str = ""
@@ -56,12 +57,15 @@ class DeepgramASRExtension(AsyncASRBaseExtension):
         await asyncio.sleep(0.2)
         await self.start_connection()
 
-
     def _on_close(self, *args, **kwargs):
-        self.ten_env.log_info(f"deepgram event callback on_close: {args}, {kwargs}")
+        self.ten_env.log_info(
+            f"deepgram event callback on_close: {args}, {kwargs}"
+        )
         self.connected = False
         if not self.stopped:
-            self.ten_env.log_warn("Deepgram connection closed unexpectedly. Reconnecting...")
+            self.ten_env.log_warn(
+                "Deepgram connection closed unexpectedly. Reconnecting..."
+            )
             asyncio.create_task(self._handle_reconnect())
 
     async def _on_open(self, _, event):
@@ -95,12 +99,13 @@ class DeepgramASRExtension(AsyncASRBaseExtension):
         )
         await self.send_asr_transcription(transcription)
 
-
     async def start_connection(self) -> None:
         self.ten_env.log_info("start and listen deepgram")
 
         if self.config is None:
-            self.config = await DeepgramASRConfig.create_async(ten_env=self.ten_env)
+            self.config = await DeepgramASRConfig.create_async(
+                ten_env=self.ten_env
+            )
             self.ten_env.log_info(f"config: {self.config}")
 
             if not self.config.api_key:
