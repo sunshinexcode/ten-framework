@@ -91,6 +91,12 @@
             "property": {
               "api_key": "${env:WEATHERAPI_API_KEY|}"
             }
+          },
+          {
+            "type": "extension",
+            "name": "adapter",
+            "extension_group": "default",
+            "addon": "data_adapter_python"
           }
         ],
         "connections": [
@@ -128,22 +134,6 @@
                 "dest": [
                   {
                     "extension": "stt"
-                  }
-                ]
-              }
-            ]
-          },
-          {
-            "extension": "stt",
-            "data": [
-              {
-                "name": "text_data",
-                "dest": [
-                  {
-                    "extension": "interrupt_detector"
-                  },
-                  {
-                    "extension": "message_collector"
                   }
                 ]
               }
@@ -258,6 +248,35 @@
                 "dest": [
                   {
                     "extension": "llm"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "extension": "stt",
+            "data": [
+              {
+                "name": "asr_result",
+                "dest": [
+                  {
+                    "extension": "adapter"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "extension": "adapter",
+            "data": [
+              {
+                "name": "text_data",
+                "dest": [
+                  {
+                    "extension": "interrupt_detector"
+                  },
+                  {
+                    "extension": "message_collector"
                   }
                 ]
               }
@@ -506,7 +525,7 @@
       },
       {
         "name": "voice_assistant_realtime",
-        "auto_start": true,
+        "auto_start": false,
         "nodes": [
           {
             "type": "extension",
@@ -1355,6 +1374,8 @@
         ]
       }
     ],
-    "log_level": 3
+    "log": {
+      "level": 3
+    }
   }
 }

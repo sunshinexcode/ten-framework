@@ -107,6 +107,7 @@ class OpenAIChatGPTExtension(AsyncLLMBaseExtension):
 
         if cmd_name == CMD_IN_FLUSH:
             await self.flush_input_items(async_ten_env)
+            async_ten_env.log_info("on_cmd flush input items")
             await async_ten_env.send_cmd(Cmd.create(CMD_OUT_FLUSH))
             async_ten_env.log_info("on_cmd sent flush")
             status_code, detail = StatusCode.OK, "success"
@@ -134,11 +135,11 @@ class OpenAIChatGPTExtension(AsyncLLMBaseExtension):
 
     async def on_data(self, async_ten_env: AsyncTenEnv, data: Data) -> None:
         data_name = data.get_name()
-        async_ten_env.log_debug("on_data name {}".format(data_name))
+        async_ten_env.log_info("on_data name {}".format(data_name))
 
         # Get the necessary properties
-        is_final = get_property_bool(data, "is_final")
-        input_text = get_property_string(data, "text")
+        is_final, _ = data.get_property_bool("is_final")
+        input_text, _ = data.get_property_bool("text")
 
         if not is_final:
             async_ten_env.log_debug("ignore non-final input")
