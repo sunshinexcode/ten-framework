@@ -14,11 +14,6 @@
       "version": "=0.21.0-rc1"
     },
     {
-      "type": "extension",
-      "name": "agora_sess_ctrl",
-      "version": "=0.4.4"
-    },
-    {
       "type": "system",
       "name": "azure_speech_sdk",
       "version": "1.38.0"
@@ -26,7 +21,7 @@
     {
       "type": "system",
       "name": "ten_ai_base",
-      "version": "=0.6.2"
+      "version": "=0.6.4"
     },
     {
       "type": "extension",

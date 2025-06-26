@@ -139,7 +139,7 @@ class OpenAIChatGPTExtension(AsyncLLMBaseExtension):
 
         # Get the necessary properties
         is_final, _ = data.get_property_bool("is_final")
-        input_text, _ = data.get_property_bool("text")
+        input_text, _ = data.get_property_string("text")
 
         if not is_final:
             async_ten_env.log_debug("ignore non-final input")
