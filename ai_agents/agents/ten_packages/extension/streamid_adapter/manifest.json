@@ -1,6 +1,6 @@
 {
   "type": "extension",
-  "name": "mcp_client_python",
+  "name": "streamid_adapter",
   "version": "0.1.0",
   "dependencies": [
     {
@@ -13,20 +13,12 @@
     "include": [
       "manifest.json",
       "property.json",
+      "**.tent",
       "**.py",
-      "README.md"
+      "README.md",
+      "tests/**"
     ]
   },
   "api": {
-    "property": {
-      "properties": {
-        "url": {
-          "type": "string"
-        }
-      }
-    }
-  },
-  "scripts": {
-    "test": "tests/bin/start"
   }
 }

@@ -97,6 +97,11 @@
             "name": "adapter",
             "extension_group": "default",
             "addon": "data_adapter_python"
+          },
+          {
+            "type": "extension",
+            "name": "streamid_adapter",
+            "addon": "streamid_adapter"
           }
         ],
         "connections": [
@@ -133,7 +138,7 @@
                 "name": "pcm_frame",
                 "dest": [
                   {
-                    "extension": "stt"
+                    "extension": "streamid_adapter"
                   }
                 ]
               }
@@ -277,6 +282,19 @@
                   },
                   {
                     "extension": "message_collector"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "extension": "streamid_adapter",
+            "audio_frame": [
+              {
+                "name": "pcm_frame",
+                "dest": [
+                  {
+                    "extension": "stt"
                   }
                 ]
               }
