@@ -170,7 +170,9 @@ class MessageCollectorExtension(Extension):
                 )
 
             try:
-                final, _ = data.get_property_bool(TEXT_DATA_FINAL_FIELD)
+                final, err = data.get_property_bool(TEXT_DATA_FINAL_FIELD)
+                if err:
+                    final = True  # Default to True if not set
             except Exception:
                 pass
 
