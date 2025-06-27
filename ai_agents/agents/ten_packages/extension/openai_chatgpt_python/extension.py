@@ -22,8 +22,6 @@ from ten_ai_base.const import (
 )
 from ten_ai_base.helper import (
     AsyncEventEmitter,
-    get_property_bool,
-    get_property_string,
 )
 from ten_ai_base.types import (
     LLMCallCompletionArgs,
