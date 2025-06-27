@@ -15,9 +15,11 @@ from ten_runtime import (
 )
 from ten_ai_base.config import BaseConfig
 
+
 @dataclass
 class DataAdapterConfig(BaseConfig):
     pass
+
 
 class DataAdapterExtension(AsyncExtension):
     async def on_init(self, ten_env: AsyncTenEnv) -> None:

@@ -95,4 +95,6 @@ class InterruptDetectorExtension(Extension):
         d.set_property_bool(TEXT_DATA_FINAL_FIELD, final)
         d.set_property_string(TEXT_DATA_TEXT_FIELD, text)
         ten.send_data(d)
-        ten.log_info(f"sent data: {data.get_name()} with text: {text} and final: {final}")
+        ten.log_info(
+            f"sent data: {data.get_name()} with text: {text} and final: {final}"
+        )

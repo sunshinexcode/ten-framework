@@ -82,7 +82,9 @@ class DeepgramASRExtension(AsyncASRBaseExtension):
             return
 
         start_ms = int(result.start * 1000)  # convert seconds to milliseconds
-        duration_ms = int(result.duration * 1000)  # convert seconds to milliseconds
+        duration_ms = int(
+            result.duration * 1000
+        )  # convert seconds to milliseconds
 
         is_final = result.is_final
         self.ten_env.log_info(
