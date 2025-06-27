@@ -1,3 +1,4 @@
+from pydantic import BaseModel
 from ten_ai_base.asr import AsyncASRBaseExtension
 from ten_ai_base.transcription import UserTranscription
 from ten_runtime import (
@@ -18,11 +19,9 @@ from deepgram import (
 )
 from dataclasses import dataclass
 
-from ten_ai_base.config import BaseConfig
-
 
 @dataclass
-class DeepgramASRConfig(BaseConfig):
+class DeepgramASRConfig(BaseModel):
     api_key: str = ""
     language: str = "en-US"
     model: str = "nova-2"
@@ -105,10 +104,9 @@ class DeepgramASRExtension(AsyncASRBaseExtension):
         self.ten_env.log_info("start and listen deepgram")
 
         if self.config is None:
-            self.config = await DeepgramASRConfig.create_async(
-                ten_env=self.ten_env
-            )
-            self.ten_env.log_info(f"config: {self.config}")
+            config_json, _ = await self.ten_env.get_property_to_json("")
+            self.config = DeepgramASRConfig.model_validate_json(config_json)
+            self.ten_env.log_debug(f"config: {self.config}")
 
             if not self.config.api_key:
                 self.ten_env.log_error("get property api_key")
