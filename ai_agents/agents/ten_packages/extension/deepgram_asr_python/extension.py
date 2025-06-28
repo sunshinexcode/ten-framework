@@ -151,14 +151,16 @@ class DeepgramASRExtension(AsyncASRBaseExtension):
             self.connected = False
             self.ten_env.log_info("deepgram connection stopped")
 
-    async def send_audio(self, frame: AudioFrame, session_id: str | None) -> None:
+    async def send_audio(
+        self, frame: AudioFrame, session_id: str | None
+    ) -> None:
         frame_buf = frame.get_buf()
         return await self.client.send(frame_buf)
 
     def is_connected(self) -> bool:
         return self.connected and self.client is not None
 
-    async def drain(self) -> None:
+    async def finalize(self, session_id: str | None) -> None:
         pass
 
     def input_audio_sample_rate(self) -> int:
