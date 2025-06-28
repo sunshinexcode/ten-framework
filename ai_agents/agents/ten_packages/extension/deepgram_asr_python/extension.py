@@ -1,5 +1,7 @@
+from typing import Any, Dict, List
 from pydantic import BaseModel
 from ten_ai_base.asr import AsyncASRBaseExtension
+from ten_ai_base.message import ErrorMessage, ErrorMessageVendorInfo, ModuleType
 from ten_ai_base.transcription import UserTranscription
 from ten_runtime import (
     AsyncTenEnv,
@@ -17,7 +19,7 @@ from deepgram import (
     LiveTranscriptionEvents,
     LiveOptions,
 )
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 @dataclass
@@ -31,6 +33,20 @@ class DeepgramASRConfig(BaseModel):
     encoding: str = "linear16"
     interim_results: bool = True
     punctuate: bool = True
+    params: Dict[str, Any] = field(default_factory=dict)
+    black_list_params: List[str] = field(
+        default_factory=lambda: [
+            "channels",
+            "encoding",
+            "multichannel",
+            "sample_rate",
+            "callback_method",
+            "callback",
+        ]
+    )
+
+    def is_black_list_params(self, key: str) -> bool:
+        return key in self.black_list_params
 
 
 class DeepgramASRExtension(AsyncASRBaseExtension):
@@ -72,7 +88,26 @@ class DeepgramASRExtension(AsyncASRBaseExtension):
         self.connected = True
 
     async def _on_error(self, _, error):
-        self.ten_env.log_error(f"deepgram event callback on_error: {error}")
+        self.ten_env.log_error(
+            f"deepgram event callback on_error: {error.to_json()}"
+        )
+
+        if self.on_error:
+            error_message = ErrorMessage(
+                code=-1,
+                message=error.to_json(),
+                turn_id=0,
+                module=ModuleType.STT,
+            )
+
+            await self.send_asr_error(
+                error_message,
+                ErrorMessageVendorInfo(
+                    vendor="deepgram",
+                    code=error.code,
+                    message=error.message,
+                ),
+            )
 
     async def _on_message(self, _, result):
         sentence = result.channel.alternatives[0].transcript
@@ -134,6 +169,15 @@ class DeepgramASRExtension(AsyncASRBaseExtension):
             interim_results=self.config.interim_results,
             punctuate=self.config.punctuate,
         )
+
+        # Update options with params
+        if self.config.params:
+            for key, value in self.config.params.items():
+                # Check if it's a valid option and not in black list
+                if hasattr(
+                    options, key
+                ) and not self.config.is_black_list_params(key):
+                    setattr(self.options, key, value)
 
         self.ten_env.log_info(f"deepgram options: {options}")
         # connect to websocket
