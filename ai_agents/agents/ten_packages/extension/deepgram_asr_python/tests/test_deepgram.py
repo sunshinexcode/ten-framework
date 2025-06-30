@@ -14,7 +14,12 @@ from ten_runtime import (
     AsyncTenEnvTester,
     AudioFrame,
     Data,
+    TenError,
+    TenErrorCode,
 )
+
+# We must import it, which means this test fixture will be automatically executed
+from tests.mock import patch_deepgram_ws  # noqa: F401
 
 
 class ExtensionTesterDeepgram(AsyncExtensionTester):
@@ -56,20 +61,45 @@ class ExtensionTesterDeepgram(AsyncExtensionTester):
         if name == "asr_result":
             json_str, _ = data.get_property_to_json(None)
 
-            # json_data = json.loads(json_str)
+            json_data = json.loads(json_str)
 
-            # language = json_data.get("language", "")
+            language = json_data.get("language", "")
+            if language != "en-US":
+                ten_env.log_error(f"language: {language}")
+                ten_env.stop_test(
+                    TenError.create(
+                        TenErrorCode.ErrorCodeGeneric,
+                        f"unexpected language: {language}",
+                    )
+                )
+                return
 
-            # assert language == "en-US"
+            text = json_data.get("text", "")
+            if text != "hello world":
+                ten_env.log_error(f"text: {text}")
+                ten_env.stop_test(
+                    TenError.create(
+                        TenErrorCode.ErrorCodeGeneric, f"unexpected text: {text}"
+                    )
+                )
+                return
 
+            # Success
             ten_env.stop_test()
 
     async def on_stop(self, ten_env: AsyncTenEnvTester) -> None:
+        ten_env.log_info("Stopping audio sender task...")
         self.sender_task.cancel()
         try:
             await self.sender_task
         except asyncio.CancelledError:
-            pass
+            ten_env.log_info("Audio sender task cancelled successfully")
+        except Exception as e:
+            ten_env.log_error(f"Error while cancelling audio sender task: {str(e)}")
+        finally:
+            ten_env.log_info("Audio sender task cleanup completed")
+
+        print("on_stop_done")
 
 
 def test_deepgram(patch_deepgram_ws):
@@ -77,22 +107,71 @@ def test_deepgram(patch_deepgram_ws):
         await asyncio.sleep(1)
         handler = patch_deepgram_ws._handlers.get("Results")
         if handler:
-            await handler(None, SimpleNamespace(
-                channel=SimpleNamespace(
-                    alternatives=[SimpleNamespace(transcript="hello world")]
+            await handler(
+                None,
+                SimpleNamespace(
+                    channel=SimpleNamespace(
+                        alternatives=[SimpleNamespace(transcript="hello world")]
+                    ),
+                    start=0.0,
+                    duration=0.5,
+                    is_final=True,
                 ),
-                start=0.0, duration=0.5, is_final=True
-            ))
+            )
         return True
 
     patch_deepgram_ws.start.side_effect = fake_start
 
+    tester = ExtensionTesterDeepgram()
+    tester.set_test_mode_single(
+        "deepgram_asr_python",
+        json.dumps(
+            {
+                "api_key": "111",
+                "language": "en-US",
+                "model": "nova-2",
+                "sample_rate": 16000,
+            }
+        ),
+    )
+
+    error = tester.run()
+    assert error is None
+
+def test_deepgram_unexpected_result(patch_deepgram_ws):
+    async def fake_start(*args, **kwargs):
+        await asyncio.sleep(1)
+        handler = patch_deepgram_ws._handlers.get("Results")
+        if handler:
+            await handler(
+                None,
+                SimpleNamespace(
+                    channel=SimpleNamespace(
+                        alternatives=[SimpleNamespace(transcript="goodbye world")]
+                    ),
+                    start=0.0,
+                    duration=0.5,
+                    is_final=True,
+                ),
+            )
+        return True
+
+    patch_deepgram_ws.start.side_effect = fake_start
 
     tester = ExtensionTesterDeepgram()
-    tester.set_test_mode_single("deepgram_asr_python", json.dumps({
-        "api_key": "111",
-        "language": "en-US",
-        "model": "nova-2",
-        "sample_rate": 16000
-    }))
-    tester.run()
+    tester.set_test_mode_single(
+        "deepgram_asr_python",
+        json.dumps(
+            {
+                "api_key": "111",
+                "language": "en-US",
+                "model": "nova-2",
+                "sample_rate": 16000,
+            }
+        ),
+    )
+
+    error = tester.run()
+    assert error is not None
+    assert error.error_code() == TenErrorCode.ErrorCodeGeneric
+    assert error.error_message() == "unexpected text: goodbye world"

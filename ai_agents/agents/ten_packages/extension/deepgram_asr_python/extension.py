@@ -14,11 +14,11 @@ from ten_runtime import (
 import asyncio
 
 from deepgram import (
-    AsyncListenWebSocketClient,
     DeepgramClientOptions,
     LiveTranscriptionEvents,
     LiveOptions,
 )
+import deepgram
 from dataclasses import dataclass, field
 
 
@@ -54,7 +54,7 @@ class DeepgramASRExtension(AsyncASRBaseExtension):
         super().__init__(name)
 
         self.connected = False
-        self.client: AsyncListenWebSocketClient = None
+        self.client: deepgram.AsyncListenWebSocketClient = None
         self.config: DeepgramASRConfig = None
 
     async def on_init(self, ten_env: AsyncTenEnv) -> None:
@@ -73,9 +73,7 @@ class DeepgramASRExtension(AsyncASRBaseExtension):
         await self.start_connection()
 
     def _on_close(self, *args, **kwargs):
-        self.ten_env.log_info(
-            f"deepgram event callback on_close: {args}, {kwargs}"
-        )
+        self.ten_env.log_info(f"deepgram event callback on_close: {args}, {kwargs}")
         self.connected = False
         if not self.stopped:
             self.ten_env.log_warn(
@@ -88,9 +86,7 @@ class DeepgramASRExtension(AsyncASRBaseExtension):
         self.connected = True
 
     async def _on_error(self, _, error):
-        self.ten_env.log_error(
-            f"deepgram event callback on_error: {error.to_json()}"
-        )
+        self.ten_env.log_error(f"deepgram event callback on_error: {error.to_json()}")
 
         if self.on_error:
             error_message = ErrorMessage(
@@ -117,9 +113,7 @@ class DeepgramASRExtension(AsyncASRBaseExtension):
                 return
 
             start_ms = int(result.start * 1000)  # convert seconds to milliseconds
-            duration_ms = int(
-                result.duration * 1000
-            )  # convert seconds to milliseconds
+            duration_ms = int(result.duration * 1000)  # convert seconds to milliseconds
 
             is_final = result.is_final
             self.ten_env.log_info(
@@ -152,7 +146,7 @@ class DeepgramASRExtension(AsyncASRBaseExtension):
 
         await self.stop_connection()
 
-        self.client = AsyncListenWebSocketClient(
+        self.client = deepgram.AsyncListenWebSocketClient(
             config=DeepgramClientOptions(
                 api_key=self.config.api_key, options={"keepalive": "true"}
             )
@@ -177,9 +171,7 @@ class DeepgramASRExtension(AsyncASRBaseExtension):
         if self.config.params:
             for key, value in self.config.params.items():
                 # Check if it's a valid option and not in black list
-                if hasattr(
-                    options, key
-                ) and not self.config.is_black_list_params(key):
+                if hasattr(options, key) and not self.config.is_black_list_params(key):
                     setattr(self.options, key, value)
 
         self.ten_env.log_info(f"deepgram options: {options}")
@@ -201,9 +193,7 @@ class DeepgramASRExtension(AsyncASRBaseExtension):
         except Exception as e:
             self.ten_env.log_error(f"Error stopping deepgram connection: {e}")
 
-    async def send_audio(
-        self, frame: AudioFrame, session_id: str | None
-    ) -> None:
+    async def send_audio(self, frame: AudioFrame, session_id: str | None) -> None:
         frame_buf = frame.get_buf()
         return await self.client.send(frame_buf)
 
