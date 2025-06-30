@@ -4,37 +4,39 @@
 # See the LICENSE file for more information.
 #
 
+from types import SimpleNamespace
 import pytest
-from unittest.mock import AsyncMock, patch
-
+from unittest.mock import MagicMock, patch
 
 @pytest.fixture(scope="function")
-def patch_deepgram_ws():
-    """
-    Automatically patch AsyncListenWebSocketClient globally before any test runs.
-    """
-    patch_target = "ten_packages.extension.deepgram_asr_python.extension.deepgram.AsyncListenWebSocketClient"
+def patch_azure_ws():
+    patch_target = "ten_packages.extension.azure_asr_python.extension.speechsdk.SpeechRecognizer"
 
-    with patch(patch_target) as MockWSClient:
-        print(f"✅ Patching {patch_target} before test session.")
+    with patch(patch_target) as MockRecognizer, \
+        patch("ten_packages.extension.azure_asr_python.extension.speechsdk.SpeechConfig") as MockSpeechConfig, \
+        patch("ten_packages.extension.azure_asr_python.extension.speechsdk.audio.AudioConfig") as MockAudioConfig, \
+        patch("ten_packages.extension.azure_asr_python.extension.speechsdk.audio.PushAudioInputStream") as MockStream, \
+        patch("ten_packages.extension.azure_asr_python.extension.speechsdk.audio.AudioStreamFormat") as MockStreamFormat:
 
-        mock_ws = AsyncMock()
-        mock_ws.start.return_value = True
-        mock_ws.send.return_value = None
-        mock_ws.finish.return_value = None
+        recognizer_instance = MagicMock()
+        event_handlers = {}
+        patch_azure_ws.event_handlers = event_handlers
 
-        mock_ws._handlers = {}
+        def connect_mock(handler):
+            event_handlers["recognized"] = handler
 
-        def mock_on(event_name, callback):
-            event_str = (
-                str(event_name)
-                if not isinstance(event_name, str)
-                else event_name
-            )
-            mock_ws._handlers[event_str] = callback
+        recognizer_instance.recognized.connect.side_effect = connect_mock
 
-        mock_ws.on = mock_on
+        MockRecognizer.return_value = recognizer_instance
+        MockSpeechConfig.return_value = MagicMock()
+        MockAudioConfig.return_value = MagicMock()
+        MockStream.return_value = MagicMock()
+        MockStreamFormat.return_value = MagicMock()
 
-        MockWSClient.return_value = mock_ws
-        yield mock_ws
-        # patch stays active through the whole session
+
+        fixture_obj = SimpleNamespace(
+            recognizer_instance=recognizer_instance,
+            event_handlers=event_handlers
+        )
+
+        yield fixture_obj

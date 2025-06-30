@@ -7,7 +7,13 @@
 import asyncio
 import json
 import os
+import threading
+from time import sleep
+import time
 from types import SimpleNamespace
+from unittest.mock import MagicMock
+
+import pytest
 
 from ten_runtime import (
     AsyncExtensionTester,
@@ -19,36 +25,28 @@ from ten_runtime import (
 )
 
 # We must import it, which means this test fixture will be automatically executed
-from .mock import patch_deepgram_ws  # noqa: F401
+from .mock import patch_azure_ws  # noqa: F401
 
 
-class ExtensionTesterDeepgram(AsyncExtensionTester):
+class ExtensionTesterAzure(AsyncExtensionTester):
     def __init__(self):
         super().__init__()
+        self.stopped = False
 
     async def audio_sender(self, ten_env: AsyncTenEnvTester):
-        # audio file path: ../test_data/test.pcm
-        audio_file_path = os.path.join(
-            os.path.dirname(__file__), "test_data/16k_en_US.pcm"
-        )
-
-        print(f"audio_file_path: {audio_file_path}")
-
-        with open(audio_file_path, "rb") as audio_file:
-            chunk_size = 320
-            while True:
-                chunk = audio_file.read(chunk_size)
-                if not chunk:
-                    break
-                audio_frame = AudioFrame.create("pcm_frame")
-                audio_frame.set_property_int("stream_id", 123)
-                audio_frame.set_property_string("remote_user_id", "123")
-                audio_frame.alloc_buf(len(chunk))
-                buf = audio_frame.lock_buf()
-                buf[:] = chunk
-                audio_frame.unlock_buf(buf)
-                await ten_env.send_audio_frame(audio_frame)
-                await asyncio.sleep(0.01)
+        while not self.stopped:
+            chunk = b"\x01\x02" * 160  # 320 bytes (16-bit * 160 samples)
+            if not chunk:
+                break
+            audio_frame = AudioFrame.create("pcm_frame")
+            audio_frame.set_property_int("stream_id", 123)
+            audio_frame.set_property_string("remote_user_id", "123")
+            audio_frame.alloc_buf(len(chunk))
+            buf = audio_frame.lock_buf()
+            buf[:] = chunk
+            audio_frame.unlock_buf(buf)
+            await ten_env.send_audio_frame(audio_frame)
+            await asyncio.sleep(0.1)
 
     async def on_start(self, ten_env: AsyncTenEnvTester) -> None:
         # Create a task to read pcm file and send to extension
@@ -90,6 +88,7 @@ class ExtensionTesterDeepgram(AsyncExtensionTester):
 
     async def on_stop(self, ten_env: AsyncTenEnvTester) -> None:
         ten_env.log_info("Stopping audio sender task...")
+        self.stopped = True
         self.sender_task.cancel()
         try:
             await self.sender_task
@@ -105,30 +104,35 @@ class ExtensionTesterDeepgram(AsyncExtensionTester):
         print("on_stop_done")
 
 
-def test_deepgram(patch_deepgram_ws):
-    async def fake_start(*args, **kwargs):
-        await asyncio.sleep(1)
-        handler = patch_deepgram_ws._handlers.get("Results")
-        if handler:
-            await handler(
-                None,
-                SimpleNamespace(
-                    channel=SimpleNamespace(
-                        alternatives=[SimpleNamespace(transcript="hello world")]
-                    ),
-                    start=0.0,
-                    duration=0.5,
-                    is_final=True,
-                    from_finalize=True,  # Simulate a finalization event
-                ),
-            )
-        return True
+def test_azure(patch_azure_ws):
+    def fake_start_continuous_recognition_async_get():
 
-    patch_deepgram_ws.start.side_effect = fake_start
+        def triggerRecognized():
+            evt = SimpleNamespace(result=SimpleNamespace(
+                json=json.dumps({
+                    "DisplayText": "hello world",
+                    "Offset": 0,
+                    "Duration": 5000000
+                })
+            ))
+            patch_azure_ws.event_handlers["recognized"](evt)
 
-    tester = ExtensionTesterDeepgram()
+        threading.Timer(1.0, triggerRecognized).start()
+        return None
+
+
+    start_future = MagicMock()
+    start_future.get.side_effect = fake_start_continuous_recognition_async_get
+
+    # Inject into recognizer
+    patch_azure_ws.recognizer_instance.start_continuous_recognition_async.return_value = start_future
+    stop_future = MagicMock()
+    stop_future.get.return_value = None
+    patch_azure_ws.recognizer_instance.stop_continuous_recognition_async.return_value = stop_future
+
+    tester = ExtensionTesterAzure()
     tester.set_test_mode_single(
-        "deepgram_asr_python",
+        "azure_asr_python",
         json.dumps(
             {
                 "api_key": "111",
@@ -143,32 +147,36 @@ def test_deepgram(patch_deepgram_ws):
     assert error is None
 
 
-def test_deepgram_unexpected_result(patch_deepgram_ws):
-    async def fake_start(*args, **kwargs):
-        await asyncio.sleep(1)
-        handler = patch_deepgram_ws._handlers.get("Results")
-        if handler:
-            await handler(
-                None,
-                SimpleNamespace(
-                    channel=SimpleNamespace(
-                        alternatives=[
-                            SimpleNamespace(transcript="goodbye world")
-                        ]
-                    ),
-                    start=0.0,
-                    duration=0.5,
-                    is_final=True,
-                    from_finalize=True,  # Simulate a finalization event
-                ),
-            )
-        return True
 
-    patch_deepgram_ws.start.side_effect = fake_start
+def test_azure_unexpected_result(patch_azure_ws):
+    def fake_start_continuous_recognition_async_get():
 
-    tester = ExtensionTesterDeepgram()
+        def triggerRecognized():
+            evt = SimpleNamespace(result=SimpleNamespace(
+                json=json.dumps({
+                    "DisplayText": "goodbye world",
+                    "Offset": 0,
+                    "Duration": 5000000
+                })
+            ))
+            patch_azure_ws.event_handlers["recognized"](evt)
+
+        threading.Timer(1.0, triggerRecognized).start()
+        return None
+
+
+    start_future = MagicMock()
+    start_future.get.side_effect = fake_start_continuous_recognition_async_get
+
+    # Inject into recognizer
+    patch_azure_ws.recognizer_instance.start_continuous_recognition_async.return_value = start_future
+    stop_future = MagicMock()
+    stop_future.get.return_value = None
+    patch_azure_ws.recognizer_instance.stop_continuous_recognition_async.return_value = stop_future
+
+    tester = ExtensionTesterAzure()
     tester.set_test_mode_single(
-        "deepgram_asr_python",
+        "azure_asr_python",
         json.dumps(
             {
                 "api_key": "111",

@@ -1,5 +1,6 @@
 from datetime import datetime
 import json
+import traceback
 from typing import Any, Dict, List
 from pydantic import BaseModel
 from ten_ai_base.asr import AsyncASRBaseExtension
@@ -200,58 +201,71 @@ class AzureASRExtension(AsyncASRBaseExtension):
 
     async def start_connection(self) -> None:
         self.ten_env.log_info("start and listen azure")
+        try:
 
-        if self.config is None:
-            config_json, _ = await self.ten_env.get_property_to_json("")
-            self.config = AzureASRConfig.model_validate_json(config_json)
-            self.ten_env.log_info(f"config: {self.config}")
+            if self.config is None:
+                config_json, _ = await self.ten_env.get_property_to_json("")
+                self.config = AzureASRConfig.model_validate_json(config_json)
+                self.ten_env.log_info(f"config: {self.config}")
 
-            if not self.config.api_key or not self.config.region:
-                self.ten_env.log_error("get property api_key or region failed")
-                return
+                if not self.config.api_key or not self.config.region:
+                    self.ten_env.log_error("get property api_key or region failed")
+                    return
 
-        await self.stop_connection()
+            await self.stop_connection()
 
-        stream_format = speechsdk.audio.AudioStreamFormat(
-            channels=self.input_audio_channels(),
-            samples_per_second=self.input_audio_sample_rate(),
-            bits_per_sample=self.input_audio_sample_width() * 8,
-            wave_stream_format=speechsdk.AudioStreamWaveFormat.PCM
-        )
+            stream_format = speechsdk.audio.AudioStreamFormat(
+                channels=self.input_audio_channels(),
+                samples_per_second=self.input_audio_sample_rate(),
+                bits_per_sample=self.input_audio_sample_width() * 8,
+                wave_stream_format=speechsdk.AudioStreamWaveFormat.PCM
+            )
 
-        self.stream = speechsdk.audio.PushAudioInputStream(stream_format=stream_format)
-        audio_config = speechsdk.audio.AudioConfig(stream=self.stream)
+            self.stream = speechsdk.audio.PushAudioInputStream(stream_format=stream_format)
+            audio_config = speechsdk.audio.AudioConfig(stream=self.stream)
 
-        speech_config = speechsdk.SpeechConfig(
-            subscription=self.config.api_key,
-            region=self.config.region,
-        )
+            speech_config = speechsdk.SpeechConfig(
+                subscription=self.config.api_key,
+                region=self.config.region,
+            )
 
-        if self.config.azure_log_path:
-            speech_config.set_property(speechsdk.PropertyId.Speech_LogFilename, self.config.azure_log_path)
+            if self.config.azure_log_path:
+                speech_config.set_property(speechsdk.PropertyId.Speech_LogFilename, self.config.azure_log_path)
 
-        # Set the Speech_SegmentationSilenceTimeoutMs parameter to 3500ms
-        # speech_config.set_property(speechsdk.PropertyId.Speech_SegmentationSilenceTimeoutMs, "3500")
+            # Set the Speech_SegmentationSilenceTimeoutMs parameter to 3500ms
+            # speech_config.set_property(speechsdk.PropertyId.Speech_SegmentationSilenceTimeoutMs, "3500")
 
-        self.client = speechsdk.SpeechRecognizer(
-            speech_config=speech_config,
-            audio_config=audio_config,
-        )
-
-
-
-        loop = asyncio.get_running_loop()
-
-        self.client.recognizing.connect(lambda evt: loop.call_soon_threadsafe(asyncio.create_task, self._on_recognizing(evt)))
-        self.client.recognized.connect(lambda evt: loop.call_soon_threadsafe(asyncio.create_task, self._on_recognized(evt)))
-        self.client.session_started.connect(lambda evt: loop.call_soon_threadsafe(asyncio.create_task, self._on_session_started(evt)))
-        self.client.session_stopped.connect(lambda evt: loop.call_soon_threadsafe(asyncio.create_task, self._on_session_stopped(evt)))
-        self.client.canceled.connect(lambda evt: loop.call_soon_threadsafe(asyncio.create_task, self._on_canceled(evt)))
+            self.client = speechsdk.SpeechRecognizer(
+                speech_config=speech_config,
+                audio_config=audio_config,
+            )
 
 
-        result_future = self.client.start_continuous_recognition_async()
-        await loop.run_in_executor(None, result_future.get)
-        self.ten_env.log_info("start_connection completed")
+
+            loop = asyncio.get_running_loop()
+
+            self.client.recognizing.connect(lambda evt: loop.call_soon_threadsafe(asyncio.create_task, self._on_recognizing(evt)))
+            self.client.recognized.connect(lambda evt: loop.call_soon_threadsafe(asyncio.create_task, self._on_recognized(evt)))
+            self.client.session_started.connect(lambda evt: loop.call_soon_threadsafe(asyncio.create_task, self._on_session_started(evt)))
+            self.client.session_stopped.connect(lambda evt: loop.call_soon_threadsafe(asyncio.create_task, self._on_session_stopped(evt)))
+            self.client.canceled.connect(lambda evt: loop.call_soon_threadsafe(asyncio.create_task, self._on_canceled(evt)))
+
+
+            result_future = self.client.start_continuous_recognition_async()
+            await loop.run_in_executor(None, result_future.get)
+            self.ten_env.log_info("start_connection completed")
+        except Exception as e:
+            self.ten_env.log_error(f"Error starting azure connection: {traceback.format_exc()}")
+            await self.send_asr_error(
+                ErrorMessage(
+                    code=1,
+                    message=str(e),
+                    turn_id=0,
+                    module=ModuleType.STT,
+                ),
+                None,
+            )
+            await self._handle_reconnect()
 
     async def stop_connection(self) -> None:
         try:
