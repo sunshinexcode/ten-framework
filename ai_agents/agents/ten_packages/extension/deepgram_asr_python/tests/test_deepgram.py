@@ -119,6 +119,7 @@ def test_deepgram(patch_deepgram_ws):
                     start=0.0,
                     duration=0.5,
                     is_final=True,
+                    from_finalize=True,  # Simulate a finalization event
                 ),
             )
         return True
@@ -158,6 +159,7 @@ def test_deepgram_unexpected_result(patch_deepgram_ws):
                     start=0.0,
                     duration=0.5,
                     is_final=True,
+                    from_finalize=True,  # Simulate a finalization event
                 ),
             )
         return True

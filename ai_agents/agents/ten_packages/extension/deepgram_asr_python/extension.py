@@ -126,6 +126,8 @@ class DeepgramASRExtension(AsyncASRBaseExtension):
             )  # convert seconds to milliseconds
 
             is_final = result.is_final
+            final_from_finalize = is_final and result.from_finalize
+            await self._finalize_counter_if_needed(final_from_finalize)
             self.ten_env.log_info(
                 f"deepgram got sentence: [{sentence}], is_final: {is_final}"
             )
@@ -141,6 +143,15 @@ class DeepgramASRExtension(AsyncASRBaseExtension):
             await self.send_asr_transcription(transcription)
         except Exception as e:
             self.ten_env.log_error(f"Error processing message: {e}")
+            await self.send_asr_error(
+                ErrorMessage(
+                    code=1,
+                    message=str(e),
+                    turn_id=0,
+                    module=ModuleType.STT,
+                ),
+                None,
+            )
 
     async def start_connection(self) -> None:
         self.ten_env.log_info("start and listen deepgram")
@@ -220,6 +231,16 @@ class DeepgramASRExtension(AsyncASRBaseExtension):
             f"deepgram drain start at {self.last_finalize_timestamp} session_id: {session_id}"
         )
         await self.client.finalize()
+
+    async def _finalize_counter_if_needed(self, is_final: bool) -> None:
+        if is_final and self.last_finalize_timestamp != 0:
+            timestamp = int(datetime.now().timestamp() * 1000)
+            latency = timestamp - self.last_finalize_timestamp
+            self.ten_env.log_debug(
+                f"KEYPOINT deepgram drain end at {timestamp}, counter: {latency}"
+            )
+            self.last_finalize_timestamp = 0
+            await self.send_asr_finalize_end(latency)
 
     def input_audio_sample_rate(self) -> int:
         return self.config.sample_rate
