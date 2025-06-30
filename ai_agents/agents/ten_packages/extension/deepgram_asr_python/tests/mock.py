@@ -27,7 +27,9 @@ def patch_deepgram_ws():
 
         def mock_on(event_name, callback):
             event_str = (
-                str(event_name) if not isinstance(event_name, str) else event_name
+                str(event_name)
+                if not isinstance(event_name, str)
+                else event_name
             )
             mock_ws._handlers[event_str] = callback
 
@@ -36,8 +38,3 @@ def patch_deepgram_ws():
         MockWSClient.return_value = mock_ws
         yield mock_ws
         # patch stays active through the whole session
-
-
-def mock_deepgram(func):
-    """Decorator: Quickly add Deepgram WebSocket mock to test cases"""
-    return pytest.mark.usefixtures("patch_deepgram_ws")(func)

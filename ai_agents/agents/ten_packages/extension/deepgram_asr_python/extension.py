@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Any, Dict, List
 from pydantic import BaseModel
 from ten_ai_base.asr import AsyncASRBaseExtension
@@ -56,6 +57,7 @@ class DeepgramASRExtension(AsyncASRBaseExtension):
         self.connected = False
         self.client: deepgram.AsyncListenWebSocketClient = None
         self.config: DeepgramASRConfig = None
+        self.last_finalize_timestamp: int = 0
 
     async def on_init(self, ten_env: AsyncTenEnv) -> None:
         ten_env.log_info("DeepgramASRExtension on_init")
@@ -73,7 +75,9 @@ class DeepgramASRExtension(AsyncASRBaseExtension):
         await self.start_connection()
 
     def _on_close(self, *args, **kwargs):
-        self.ten_env.log_info(f"deepgram event callback on_close: {args}, {kwargs}")
+        self.ten_env.log_info(
+            f"deepgram event callback on_close: {args}, {kwargs}"
+        )
         self.connected = False
         if not self.stopped:
             self.ten_env.log_warn(
@@ -86,7 +90,9 @@ class DeepgramASRExtension(AsyncASRBaseExtension):
         self.connected = True
 
     async def _on_error(self, _, error):
-        self.ten_env.log_error(f"deepgram event callback on_error: {error.to_json()}")
+        self.ten_env.log_error(
+            f"deepgram event callback on_error: {error.to_json()}"
+        )
 
         if self.on_error:
             error_message = ErrorMessage(
@@ -112,8 +118,12 @@ class DeepgramASRExtension(AsyncASRBaseExtension):
             if not sentence:
                 return
 
-            start_ms = int(result.start * 1000)  # convert seconds to milliseconds
-            duration_ms = int(result.duration * 1000)  # convert seconds to milliseconds
+            start_ms = int(
+                result.start * 1000
+            )  # convert seconds to milliseconds
+            duration_ms = int(
+                result.duration * 1000
+            )  # convert seconds to milliseconds
 
             is_final = result.is_final
             self.ten_env.log_info(
@@ -171,7 +181,9 @@ class DeepgramASRExtension(AsyncASRBaseExtension):
         if self.config.params:
             for key, value in self.config.params.items():
                 # Check if it's a valid option and not in black list
-                if hasattr(options, key) and not self.config.is_black_list_params(key):
+                if hasattr(
+                    options, key
+                ) and not self.config.is_black_list_params(key):
                     setattr(self.options, key, value)
 
         self.ten_env.log_info(f"deepgram options: {options}")
@@ -193,7 +205,9 @@ class DeepgramASRExtension(AsyncASRBaseExtension):
         except Exception as e:
             self.ten_env.log_error(f"Error stopping deepgram connection: {e}")
 
-    async def send_audio(self, frame: AudioFrame, session_id: str | None) -> None:
+    async def send_audio(
+        self, frame: AudioFrame, session_id: str | None
+    ) -> None:
         frame_buf = frame.get_buf()
         return await self.client.send(frame_buf)
 
@@ -201,7 +215,11 @@ class DeepgramASRExtension(AsyncASRBaseExtension):
         return self.connected and self.client is not None
 
     async def finalize(self, session_id: str | None) -> None:
-        pass
+        self.last_finalize_timestamp = int(datetime.now().timestamp() * 1000)
+        self.ten_env.log_debug(
+            f"deepgram drain start at {self.last_finalize_timestamp} session_id: {session_id}"
+        )
+        await self.client.finalize()
 
     def input_audio_sample_rate(self) -> int:
         return self.config.sample_rate

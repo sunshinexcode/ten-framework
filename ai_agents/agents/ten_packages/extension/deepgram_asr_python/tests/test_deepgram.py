@@ -19,7 +19,7 @@ from ten_runtime import (
 )
 
 # We must import it, which means this test fixture will be automatically executed
-from tests.mock import patch_deepgram_ws  # noqa: F401
+from .mock import patch_deepgram_ws  # noqa: F401
 
 
 class ExtensionTesterDeepgram(AsyncExtensionTester):
@@ -79,7 +79,8 @@ class ExtensionTesterDeepgram(AsyncExtensionTester):
                 ten_env.log_error(f"text: {text}")
                 ten_env.stop_test(
                     TenError.create(
-                        TenErrorCode.ErrorCodeGeneric, f"unexpected text: {text}"
+                        TenErrorCode.ErrorCodeGeneric,
+                        f"unexpected text: {text}",
                     )
                 )
                 return
@@ -95,7 +96,9 @@ class ExtensionTesterDeepgram(AsyncExtensionTester):
         except asyncio.CancelledError:
             ten_env.log_info("Audio sender task cancelled successfully")
         except Exception as e:
-            ten_env.log_error(f"Error while cancelling audio sender task: {str(e)}")
+            ten_env.log_error(
+                f"Error while cancelling audio sender task: {str(e)}"
+            )
         finally:
             ten_env.log_info("Audio sender task cleanup completed")
 
@@ -138,6 +141,7 @@ def test_deepgram(patch_deepgram_ws):
     error = tester.run()
     assert error is None
 
+
 def test_deepgram_unexpected_result(patch_deepgram_ws):
     async def fake_start(*args, **kwargs):
         await asyncio.sleep(1)
@@ -147,7 +151,9 @@ def test_deepgram_unexpected_result(patch_deepgram_ws):
                 None,
                 SimpleNamespace(
                     channel=SimpleNamespace(
-                        alternatives=[SimpleNamespace(transcript="goodbye world")]
+                        alternatives=[
+                            SimpleNamespace(transcript="goodbye world")
+                        ]
                     ),
                     start=0.0,
                     duration=0.5,

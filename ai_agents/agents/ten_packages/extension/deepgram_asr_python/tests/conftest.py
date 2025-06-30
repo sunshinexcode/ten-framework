@@ -10,6 +10,7 @@ from ten_runtime import (
     TenEnv,
 )
 
+
 class FakeApp(App):
     def __init__(self):
         super().__init__()
@@ -49,7 +50,9 @@ def global_setup_and_teardown():
     event = threading.Event()
     fake_app_ctx = FakeAppCtx(event)
 
-    fake_app_thread = threading.Thread(target=run_fake_app, args=(fake_app_ctx,))
+    fake_app_thread = threading.Thread(
+        target=run_fake_app, args=(fake_app_ctx,)
+    )
     fake_app_thread.start()
 
     event.wait()
