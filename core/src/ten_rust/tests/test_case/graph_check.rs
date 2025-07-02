@@ -140,7 +140,7 @@ mod tests {
         let graph_json_str =
             include_str!("../test_data/graph_check_single_app/graph.json");
         let graph =
-            Graph::from_str_with_base_dir(graph_json_str, None).unwrap();
+            Graph::from_str_with_base_dir(graph_json_str, None).await.unwrap();
 
         let mut pkgs_cache: HashMap<String, PkgsInfoInApp> = HashMap::new();
         pkgs_cache.insert(app_dir.to_string(), pkgs_info_in_app);
@@ -169,7 +169,7 @@ mod tests {
             "../test_data/graph_check_builtin_extension/graph.json"
         );
         let graph =
-            Graph::from_str_with_base_dir(graph_json_str, None).unwrap();
+            Graph::from_str_with_base_dir(graph_json_str, None).await.unwrap();
 
         let mut pkgs_cache: HashMap<String, PkgsInfoInApp> = HashMap::new();
         pkgs_cache.insert(app_dir.to_string(), pkgs_info_in_app);
@@ -211,7 +211,8 @@ mod tests {
         }
         "#;
 
-        let graph = Graph::from_str_with_base_dir(graph_json, None).unwrap();
+        let graph =
+            Graph::from_str_with_base_dir(graph_json, None).await.unwrap();
         let pkgs_cache: HashMap<String, PkgsInfoInApp> = HashMap::new();
 
         let result = graph.check(&None, &pkgs_cache);
@@ -254,9 +255,9 @@ mod tests {
                     extension: Some("ext_a".to_string()),
                     subgraph: None,
                 },
-                cmd: Some(vec![GraphMessageFlow {
-                    name: "test_cmd".to_string(),
-                    dest: vec![GraphDestination {
+                cmd: Some(vec![GraphMessageFlow::new(
+                    "test_cmd".to_string(),
+                    vec![GraphDestination {
                         loc: GraphLoc {
                             app: None,
                             extension: Some("subgraph_1:ext_b".to_string()),
@@ -264,7 +265,8 @@ mod tests {
                         },
                         msg_conversion: None,
                     }],
-                }]),
+                    vec![],
+                )]),
                 data: None,
                 audio_frame: None,
                 video_frame: None,
@@ -317,7 +319,8 @@ mod tests {
         }
         "#;
 
-        let graph = Graph::from_str_with_base_dir(graph_json, None).unwrap();
+        let graph =
+            Graph::from_str_with_base_dir(graph_json, None).await.unwrap();
         let pkgs_cache: HashMap<String, PkgsInfoInApp> = HashMap::new();
 
         let result = graph.check(&None, &pkgs_cache);

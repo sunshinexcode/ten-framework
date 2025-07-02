@@ -242,7 +242,7 @@ pub async fn graph_add_connection(
 
     // Create a message flow.
     let message_flow =
-        GraphMessageFlow { name: msg_name, dest: vec![destination] };
+        GraphMessageFlow::new(msg_name, vec![destination], vec![]);
 
     // Get or create a connection for the source node and add the message
     // flow.
@@ -278,7 +278,7 @@ pub async fn graph_add_connection(
     }
 
     // Validate the updated graph.
-    match graph.validate_and_complete_and_flatten(None) {
+    match graph.validate_and_complete_and_flatten(None).await {
         Ok(_) => Ok(()),
         Err(e) => {
             // Restore the original graph if validation fails.

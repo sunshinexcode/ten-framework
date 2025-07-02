@@ -8,6 +8,8 @@ use std::collections::HashMap;
 
 use anyhow::Result;
 
+use crate::graph::graph_info::load_graph_from_uri;
+
 use super::connection::GraphLoc;
 use super::node::GraphNode;
 use super::{
@@ -501,26 +503,22 @@ impl Graph {
 
     /// Helper function to process a loaded subgraph and integrate it into the
     /// flattened structure.
-    fn process_loaded_subgraph<F>(
+    async fn process_loaded_subgraph(
         subgraph_node: &GraphNode,
         loaded_subgraph: &Graph,
-        subgraph_loader: &F,
         current_base_dir: Option<&str>,
         flattened_nodes: &mut Vec<GraphNode>,
         flattened_connections: &mut Vec<GraphConnection>,
         subgraph_mappings: &mut HashMap<String, Graph>,
-    ) -> Result<()>
-    where
-        F: Fn(&str, Option<&str>, &mut Option<String>) -> Result<Graph>,
-    {
+    ) -> Result<()> {
         // Recursively flatten the loaded subgraph first to handle nested
         // subgraphs. This ensures depth-first processing.
-        let flattened_subgraph = Self::flatten(
+        let flattened_subgraph = Box::pin(Self::flatten_subgraphs(
             loaded_subgraph,
-            subgraph_loader,
             current_base_dir,
             true,
-        )?;
+        ))
+        .await?;
 
         // If the subgraph doesn't need flattening, use the original
         let flattened_subgraph =
@@ -563,17 +561,13 @@ impl Graph {
 
     /// Helper function to process a single subgraph node and add its flattened
     /// content to the output collections.
-    fn process_subgraph_node<F>(
+    async fn process_subgraph_node(
         subgraph_node: &GraphNode,
-        subgraph_loader: &F,
         current_base_dir: Option<&str>,
         flattened_nodes: &mut Vec<GraphNode>,
         flattened_connections: &mut Vec<GraphConnection>,
         subgraph_mappings: &mut HashMap<String, Graph>,
-    ) -> Result<()>
-    where
-        F: Fn(&str, Option<&str>, &mut Option<String>) -> Result<Graph>,
-    {
+    ) -> Result<()> {
         let import_uri =
             subgraph_node.import_uri.as_ref().ok_or_else(|| {
                 anyhow::anyhow!(
@@ -583,18 +577,22 @@ impl Graph {
             })?;
 
         let mut new_base_dir: Option<String> = None;
-        let subgraph =
-            subgraph_loader(import_uri, current_base_dir, &mut new_base_dir)?;
+        let subgraph = load_graph_from_uri(
+            import_uri,
+            current_base_dir,
+            &mut new_base_dir,
+        )
+        .await?;
 
         Self::process_loaded_subgraph(
             subgraph_node,
             &subgraph,
-            subgraph_loader,
             new_base_dir.as_deref(),
             flattened_nodes,
             flattened_connections,
             subgraph_mappings,
         )
+        .await
     }
 
     /// Helper function to process connections from a graph using subgraph
@@ -627,17 +625,13 @@ impl Graph {
 
     /// Helper function that contains the common logic for flattening a graph's
     /// nodes and connections.
-    fn flatten_graph_internal<F>(
+    async fn flatten_subgraph_internal(
         graph: &Graph,
-        subgraph_loader: &F,
         current_base_dir: Option<&str>,
         flattened_nodes: &mut Vec<GraphNode>,
         flattened_connections: &mut Vec<GraphConnection>,
         subgraph_mappings: &mut HashMap<String, Graph>,
-    ) -> Result<()>
-    where
-        F: Fn(&str, Option<&str>, &mut Option<String>) -> Result<Graph>,
-    {
+    ) -> Result<()> {
         // Process all nodes in the graph
         for node in &graph.nodes {
             match node.type_ {
@@ -647,12 +641,12 @@ impl Graph {
                 GraphNodeType::Subgraph => {
                     Self::process_subgraph_node(
                         node,
-                        subgraph_loader,
                         current_base_dir,
                         flattened_nodes,
                         flattened_connections,
                         subgraph_mappings,
-                    )?;
+                    )
+                    .await?;
                 }
             }
         }
@@ -829,15 +823,11 @@ impl Graph {
     /// Returns `Ok(None)` if the graph contains no subgraphs and doesn't need
     /// flattening. Returns `Ok(Some(flattened_graph))` if the graph was
     /// successfully flattened.
-    pub fn flatten<F>(
+    pub async fn flatten_subgraphs(
         graph: &Graph,
-        subgraph_loader: &F,
         current_base_dir: Option<&str>,
         preserve_exposed_info: bool,
-    ) -> Result<Option<Graph>>
-    where
-        F: Fn(&str, Option<&str>, &mut Option<String>) -> Result<Graph>,
-    {
+    ) -> Result<Option<Graph>> {
         // Check if this graph contains any subgraphs
         let has_subgraphs = graph
             .nodes
@@ -854,14 +844,14 @@ impl Graph {
         let mut flattened_connections = Vec::new();
         let mut subgraph_mappings = HashMap::new();
 
-        Self::flatten_graph_internal(
+        Self::flatten_subgraph_internal(
             graph,
-            subgraph_loader,
             current_base_dir,
             &mut flattened_nodes,
             &mut flattened_connections,
             &mut subgraph_mappings,
-        )?;
+        )
+        .await?;
 
         // Handle exposed_messages and exposed_properties based on
         // preserve_exposed_info flag
@@ -891,22 +881,5 @@ impl Graph {
             exposed_messages: updated_exposed_messages,
             exposed_properties: updated_exposed_properties,
         }))
-    }
-
-    /// Convenience method for flattening a graph instance without preserving
-    /// exposed info. This is the main public API for flattening graphs.
-    ///
-    /// Returns `Ok(None)` if the graph contains no subgraphs and doesn't need
-    /// flattening. Returns `Ok(Some(flattened_graph))` if the graph was
-    /// successfully flattened.
-    pub fn flatten_graph<F>(
-        &self,
-        subgraph_loader: &F,
-        current_base_dir: Option<&str>,
-    ) -> Result<Option<Graph>>
-    where
-        F: Fn(&str, Option<&str>, &mut Option<String>) -> Result<Graph>,
-    {
-        Self::flatten(self, subgraph_loader, current_base_dir, false)
     }
 }
