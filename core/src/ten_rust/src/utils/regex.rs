@@ -9,7 +9,7 @@ use anyhow::Result;
 use once_cell::sync::Lazy;
 use regex::Regex;
 
-const ALPHANUMERIC_CHARACTERS_PATTERN: &str = "^[A-Za-z_][A-Za-z0-9_]*$";
+const ALPHANUMERIC_CHARACTERS_PATTERN: &str = r"^[A-Za-z_][A-Za-z0-9_]*$";
 
 pub fn regex_match(pattern: &str, text: &str) -> Result<bool> {
     let re = Regex::new(pattern)?;

@@ -812,6 +812,20 @@ impl Graph {
         }
     }
 
+    /// Checks if there are any flows in the connections where source/dest names
+    /// are regular expressions. If found, searches the nodes list for nodes
+    /// matching the regex pattern and replaces the corresponding
+    /// source/dest with the matched node names.
+    /// Return None if no such flows are found, otherwise return the modified
+    /// graph.
+    fn check_and_replace_flow_name_regex(
+        graph: &Graph,
+    ) -> Result<Option<Graph>> {
+        // TODO(xilin): Implement this function
+
+        Ok(None)
+    }
+
     /// Flattens a graph containing subgraph nodes into a regular graph
     /// structure with only extension nodes. This process converts subgraph
     /// references into their constituent extensions with prefixed names and

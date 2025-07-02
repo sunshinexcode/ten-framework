@@ -7,11 +7,13 @@
 use std::collections::HashMap;
 
 use anyhow::Result;
-use regex::Regex;
 use serde::{Deserialize, Deserializer, Serialize};
 
-use crate::pkg_info::{
-    manifest::interface::flatten_manifest_api, value_type::ValueType,
+use crate::{
+    pkg_info::{
+        manifest::interface::flatten_manifest_api, value_type::ValueType,
+    },
+    utils::regex::is_alphanumeric_characters,
 };
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -166,13 +168,13 @@ where
     D: Deserializer<'de>,
 {
     let msg_name: String = String::deserialize(deserializer)?;
-    let re = Regex::new(r"^[A-Za-z_][A-Za-z0-9_]*$").unwrap();
-    if re.is_match(&msg_name) {
-        Ok(msg_name)
-    } else {
-        Err(serde::de::Error::custom(
+
+    if !is_alphanumeric_characters(&msg_name) {
+        return Err(serde::de::Error::custom(
             "Invalid message name format, it needs to conform to the pattern \
              ^[A-Za-z_][A-Za-z0-9_]*$",
-        ))
+        ));
     }
+
+    Ok(msg_name)
 }
