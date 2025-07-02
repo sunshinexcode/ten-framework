@@ -6,12 +6,19 @@
 //
 
 use anyhow::Result;
+use once_cell::sync::Lazy;
 use regex::Regex;
 
-pub fn regex_full_match(pattern: &str, text: &str) -> Result<bool> {
-    // Add anchors to the pattern to ensure it matches the entire text.
-    let full_pattern = format!("^{pattern}$");
+const ALPHANUMERIC_CHARACTERS_PATTERN: &str = "^[A-Za-z_][A-Za-z0-9_]*$";
 
-    let re = Regex::new(&full_pattern)?;
+pub fn regex_match(pattern: &str, text: &str) -> Result<bool> {
+    let re = Regex::new(pattern)?;
     Ok(re.is_match(text))
+}
+
+pub fn is_alphanumeric_characters(text: &str) -> bool {
+    static ALPHANUMERIC_CHARACTERS_REGEX: Lazy<Regex> =
+        Lazy::new(|| Regex::new(ALPHANUMERIC_CHARACTERS_PATTERN).unwrap());
+
+    ALPHANUMERIC_CHARACTERS_REGEX.is_match(text)
 }
