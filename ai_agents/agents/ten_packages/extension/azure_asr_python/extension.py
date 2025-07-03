@@ -27,20 +27,9 @@ class AzureASRConfig(BaseModel):
     model: str = "nova-2"
     sample_rate: int = 16000
     azure_log_path: str = "azure.log"
-
-    channels: int = 1
-    encoding: str = "linear16"
-    interim_results: bool = True
-    punctuate: bool = True
     params: Dict[str, Any] = field(default_factory=dict)
     black_list_params: List[str] = field(
         default_factory=lambda: [
-            "channels",
-            "encoding",
-            "multichannel",
-            "sample_rate",
-            "callback_method",
-            "callback",
         ]
     )
 
@@ -231,6 +220,15 @@ class AzureASRExtension(AsyncASRBaseExtension):
 
             if self.config.azure_log_path:
                 speech_config.set_property(speechsdk.PropertyId.Speech_LogFilename, self.config.azure_log_path)
+
+
+            # Update options with params
+            if self.config.params:
+                for key, value in self.config.params.items():
+                    # Check if it's a valid option and not in black list
+                    if not self.config.is_black_list_params(key):
+                        self.ten_env.log_debug(f"set azure param: {key} = {value}")
+                        speech_config.set_property(key, value)
 
             # Set the Speech_SegmentationSilenceTimeoutMs parameter to 3500ms
             # speech_config.set_property(speechsdk.PropertyId.Speech_SegmentationSilenceTimeoutMs, "3500")

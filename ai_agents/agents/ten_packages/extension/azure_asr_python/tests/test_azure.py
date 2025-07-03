@@ -139,6 +139,9 @@ def test_azure(patch_azure_ws):
                 "language": "en-US",
                 "model": "nova-2",
                 "sample_rate": 16000,
+                "params": {
+                    "test": "123"
+                }
             }
         ),
     )

@@ -29,8 +29,6 @@ class DeepgramASRConfig(BaseModel):
     language: str = "en-US"
     model: str = "nova-2"
     sample_rate: int = 16000
-
-    channels: int = 1
     encoding: str = "linear16"
     interim_results: bool = True
     punctuate: bool = True
@@ -181,8 +179,8 @@ class DeepgramASRExtension(AsyncASRBaseExtension):
         options = LiveOptions(
             language=self.config.language,
             model=self.config.model,
-            sample_rate=self.config.sample_rate,
-            channels=self.config.channels,
+            sample_rate=self.input_audio_sample_rate(),
+            channels=self.input_audio_channels(),
             encoding=self.config.encoding,
             interim_results=self.config.interim_results,
             punctuate=self.config.punctuate,
