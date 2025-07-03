@@ -2209,4 +2209,630 @@ mod tests {
         let msg = result.unwrap_err().to_string();
         assert!(msg.contains("Additional properties are not allowed"));
     }
+
+    #[test]
+    fn test_validate_selector_node_basic() {
+        // Test that selector node with valid configuration succeeds
+        let property = r#"
+        {
+          "ten": {
+            "predefined_graphs": [
+              {
+                "name": "default",
+                "nodes": [{
+                  "type": "selector",
+                  "name": "test_selector",
+                  "extension": {
+                    "type": "regex",
+                    "pattern": "ext_.*"
+                  }
+                }]
+              }
+            ]
+          }
+        }
+        "#;
+
+        let result = ten_validate_property_json_string(property);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_validate_selector_node_with_app() {
+        // Test that selector node with extension and app fields succeeds
+        let property = r#"
+        {
+          "ten": {
+            "predefined_graphs": [
+              {
+                "name": "default",
+                "nodes": [{
+                  "type": "selector",
+                  "name": "test_selector",
+                  "extension": {
+                    "type": "exact",
+                    "pattern": "test_ext"
+                  },
+                  "app": {
+                    "type": "regex",
+                    "pattern": "app_.*"
+                  }
+                }]
+              }
+            ]
+          }
+        }
+        "#;
+
+        let result = ten_validate_property_json_string(property);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_validate_selector_node_with_subgraph() {
+        // Test that selector node with only subgraph field succeeds
+        let property = r#"
+        {
+          "ten": {
+            "predefined_graphs": [
+              {
+                "name": "default",
+                "nodes": [{
+                  "type": "selector",
+                  "name": "test_selector",
+                  "subgraph": {
+                    "type": "exact",
+                    "pattern": "subgraph_1"
+                  }
+                }]
+              }
+            ]
+          }
+        }
+        "#;
+
+        let result = ten_validate_property_json_string(property);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_validate_selector_node_mutual_exclusion() {
+        // Test that selector node with both extension and subgraph fields fails
+        let property = r#"
+        {
+          "ten": {
+            "predefined_graphs": [
+              {
+                "name": "default",
+                "nodes": [{
+                  "type": "selector",
+                  "name": "test_selector",
+                  "extension": {
+                    "type": "regex",
+                    "pattern": "ext_.*"
+                  },
+                  "subgraph": {
+                    "type": "exact",
+                    "pattern": "subgraph_1"
+                  }
+                }]
+              }
+            ]
+          }
+        }
+        "#;
+
+        let result = ten_validate_property_json_string(property);
+        assert!(
+            result.is_err(),
+            "Expected validation to fail, but it succeeded"
+        );
+        let err_msg = result.unwrap_err().to_string();
+        assert!(
+            err_msg.contains("oneOf") || err_msg.contains("not"),
+            "Expected error message to mention schema validation failure, \
+             got: {err_msg}"
+        );
+
+        // Test another invalid case: subgraph with app
+        let property_subgraph_with_app = r#"
+        {
+          "ten": {
+            "predefined_graphs": [
+              {
+                "name": "default",
+                "nodes": [{
+                  "type": "selector",
+                  "name": "test_selector",
+                  "subgraph": {
+                    "type": "exact",
+                    "pattern": "subgraph_1"
+                  },
+                  "app": {
+                    "type": "regex",
+                    "pattern": "app_.*"
+                  }
+                }]
+              }
+            ]
+          }
+        }
+        "#;
+
+        let result =
+            ten_validate_property_json_string(property_subgraph_with_app);
+        assert!(
+            result.is_err(),
+            "Expected validation to fail for subgraph with app, but it \
+             succeeded"
+        );
+        let err_msg = result.unwrap_err().to_string();
+        assert!(
+            err_msg.contains("oneOf") || err_msg.contains("not"),
+            "Expected error message to mention schema validation failure, \
+             got: {err_msg}"
+        );
+    }
+
+    #[test]
+    fn test_validate_selector_node_invalid_pattern_type() {
+        // Test that selector node with invalid pattern type fails
+        let property = r#"
+        {
+          "ten": {
+            "predefined_graphs": [
+              {
+                "name": "default",
+                "nodes": [{
+                  "type": "selector",
+                  "name": "test_selector",
+                  "extension": {
+                    "type": "invalid_type",
+                    "pattern": "ext_.*"
+                  }
+                }]
+              }
+            ]
+          }
+        }
+        "#;
+
+        let result = ten_validate_property_json_string(property);
+        assert!(result.is_err());
+        let msg = result.unwrap_err().to_string();
+        assert!(msg.contains("is not one of"));
+    }
+
+    #[test]
+    fn test_validate_selector_node_subgraph_with_app() {
+        // Test that selector node with subgraph and app fields fails
+        let property = r#"
+        {
+          "ten": {
+            "predefined_graphs": [
+              {
+                "name": "default",
+                "nodes": [{
+                  "type": "selector",
+                  "name": "test_selector",
+                  "subgraph": {
+                    "type": "regex",
+                    "pattern": "subgraph_.*"
+                  },
+                  "app": {
+                    "type": "exact",
+                    "pattern": "app_1"
+                  }
+                }]
+              }
+            ]
+          }
+        }
+        "#;
+
+        let result = ten_validate_property_json_string(property);
+        assert!(result.is_err());
+        let msg = result.unwrap_err().to_string();
+        assert!(msg.contains("oneOf"));
+    }
+
+    #[test]
+    fn test_validate_selector_node_missing_required_fields() {
+        // Test that selector node without required fields fails
+        let property = r#"
+        {
+          "ten": {
+            "predefined_graphs": [
+              {
+                "name": "default",
+                "nodes": [{
+                  "type": "selector",
+                  "name": "test_selector"
+                }]
+              }
+            ]
+          }
+        }
+        "#;
+
+        let result = ten_validate_property_json_string(property);
+        assert!(result.is_err());
+        let msg = result.unwrap_err().to_string();
+        assert!(msg.contains("oneOf"));
+    }
+
+    #[test]
+    fn test_validate_pattern_matcher_missing_fields() {
+        // Test that pattern matcher without required fields fails
+        let property = r#"
+        {
+          "ten": {
+            "predefined_graphs": [
+              {
+                "name": "default",
+                "nodes": [{
+                  "type": "selector",
+                  "name": "test_selector",
+                  "extension": {
+                    "type": "regex"
+                  }
+                }]
+              }
+            ]
+          }
+        }
+        "#;
+
+        let result = ten_validate_property_json_string(property);
+        assert!(result.is_err());
+        let msg = result.unwrap_err().to_string();
+        assert!(msg.contains("required"));
+    }
+
+    #[test]
+    fn test_validate_connection_with_selector_source() {
+        // Test source using selector
+        let property = r#"
+        {
+          "ten": {
+            "predefined_graphs": [
+              {
+                "name": "default",
+                "nodes": [
+                  {
+                    "type": "extension",
+                    "name": "test_ext",
+                    "addon": "test_addon"
+                  },
+                  {
+                    "type": "selector",
+                    "name": "test_selector",
+                    "extension": {
+                      "type": "regex",
+                      "pattern": "ext_.*"
+                    }
+                  }
+                ],
+                "connections": [
+                  {
+                    "extension": "test_ext",
+                    "cmd": [
+                      {
+                        "name": "test_cmd",
+                        "source": [
+                          {
+                            "selector": "test_selector"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+        "#;
+
+        let result = ten_validate_property_json_string(property);
+        assert!(
+            result.is_ok(),
+            "Expected validation to succeed for source with selector"
+        );
+    }
+
+    #[test]
+    fn test_validate_connection_with_selector_dest() {
+        // Test dest using selector
+        let property = r#"
+        {
+          "ten": {
+            "predefined_graphs": [
+              {
+                "name": "default",
+                "nodes": [
+                  {
+                    "type": "extension",
+                    "name": "test_ext",
+                    "addon": "test_addon"
+                  },
+                  {
+                    "type": "selector",
+                    "name": "test_selector",
+                    "extension": {
+                      "type": "regex",
+                      "pattern": "ext_.*"
+                    }
+                  }
+                ],
+                "connections": [
+                  {
+                    "extension": "test_ext",
+                    "cmd": [
+                      {
+                        "name": "test_cmd",
+                        "dest": [
+                          {
+                            "selector": "test_selector"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+        "#;
+
+        let result = ten_validate_property_json_string(property);
+        assert!(
+            result.is_ok(),
+            "Expected validation to succeed for dest with selector"
+        );
+    }
+
+    #[test]
+    fn test_validate_connection_with_selector_both() {
+        // Test both source and dest using selector
+        let property = r#"
+        {
+          "ten": {
+            "predefined_graphs": [
+              {
+                "name": "default",
+                "nodes": [
+                  {
+                    "type": "extension",
+                    "name": "test_ext",
+                    "addon": "test_addon"
+                  },
+                  {
+                    "type": "selector",
+                    "name": "source_selector",
+                    "extension": {
+                      "type": "regex",
+                      "pattern": "ext_.*"
+                    }
+                  },
+                  {
+                    "type": "selector",
+                    "name": "dest_selector",
+                    "extension": {
+                      "type": "regex",
+                      "pattern": "ext_.*"
+                    }
+                  }
+                ],
+                "connections": [
+                  {
+                    "extension": "test_ext",
+                    "cmd": [
+                      {
+                        "name": "test_cmd",
+                        "source": [
+                          {
+                            "selector": "source_selector"
+                          }
+                        ],
+                        "dest": [
+                          {
+                            "selector": "dest_selector"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+        "#;
+
+        let result = ten_validate_property_json_string(property);
+        if let Err(ref e) = result {
+            println!(
+                "Error validating both source and dest with selector: {}",
+                e
+            );
+        }
+        assert!(
+            result.is_ok(),
+            "Expected validation to succeed for both source and dest with \
+             selector"
+        );
+    }
+
+    #[test]
+    fn test_validate_connection_selector_with_extension_fails() {
+        // Test selector mutual exclusion with extension
+        let property = r#"
+        {
+          "ten": {
+            "predefined_graphs": [
+              {
+                "name": "default",
+                "nodes": [
+                  {
+                    "type": "extension",
+                    "name": "test_ext",
+                    "addon": "test_addon"
+                  },
+                  {
+                    "type": "selector",
+                    "name": "test_selector",
+                    "extension": {
+                      "type": "regex",
+                      "pattern": "ext_.*"
+                    }
+                  }
+                ],
+                "connections": [
+                  {
+                    "extension": "test_ext",
+                    "cmd": [
+                      {
+                        "name": "test_cmd",
+                        "dest": [
+                          {
+                            "selector": "test_selector",
+                            "extension": "test_ext"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+        "#;
+
+        let result = ten_validate_property_json_string(property);
+        assert!(
+            result.is_err(),
+            "Expected validation to fail for selector with extension"
+        );
+        let err_msg = result.unwrap_err().to_string();
+        assert!(
+            err_msg.contains("oneOf") || err_msg.contains("not"),
+            "Expected error message to mention schema validation failure, \
+             got: {err_msg}"
+        );
+    }
+
+    #[test]
+    fn test_validate_connection_selector_with_subgraph_fails() {
+        // Test selector mutual exclusion with subgraph
+        let property = r#"
+        {
+          "ten": {
+            "predefined_graphs": [
+              {
+                "name": "default",
+                "nodes": [
+                  {
+                    "type": "extension",
+                    "name": "test_ext",
+                    "addon": "test_addon"
+                  },
+                  {
+                    "type": "selector",
+                    "name": "test_selector",
+                    "extension": {
+                      "type": "regex",
+                      "pattern": "ext_.*"
+                    }
+                  }
+                ],
+                "connections": [
+                  {
+                    "extension": "test_ext",
+                    "cmd": [
+                      {
+                        "name": "test_cmd",
+                        "dest": [
+                          {
+                            "selector": "test_selector",
+                            "subgraph": "test_subgraph"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+        "#;
+
+        let result = ten_validate_property_json_string(property);
+        assert!(
+            result.is_err(),
+            "Expected validation to fail for selector with subgraph"
+        );
+        let err_msg = result.unwrap_err().to_string();
+        assert!(
+            err_msg.contains("oneOf") || err_msg.contains("not"),
+            "Expected error message to mention schema validation failure, \
+             got: {err_msg}"
+        );
+    }
+
+    #[test]
+    fn test_validate_connection_selector_with_app() {
+        // Test selector with app
+        let property = r#"
+        {
+          "ten": {
+            "predefined_graphs": [
+              {
+                "name": "default",
+                "nodes": [
+                  {
+                    "type": "extension",
+                    "name": "test_ext",
+                    "addon": "test_addon"
+                  },
+                  {
+                    "type": "selector",
+                    "name": "test_selector",
+                    "extension": {
+                      "type": "regex",
+                      "pattern": "ext_.*"
+                    }
+                  }
+                ],
+                "connections": [
+                  {
+                    "extension": "test_ext",
+                    "cmd": [
+                      {
+                        "name": "test_cmd",
+                        "dest": [
+                          {
+                            "selector": "test_selector",
+                            "app": "test_app"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+        "#;
+
+        let result = ten_validate_property_json_string(property);
+        assert!(
+            result.is_ok(),
+            "Expected validation to succeed for selector with app"
+        );
+    }
 }

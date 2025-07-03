@@ -91,6 +91,7 @@ mod tests {
                 app: None,
                 property: None,
                 import_uri: None,
+                selector: None,
             },
             GraphNode {
                 type_: GraphNodeType::Extension,
@@ -100,6 +101,7 @@ mod tests {
                 app: None,
                 property: None,
                 import_uri: None,
+                selector: None,
             },
         ];
 

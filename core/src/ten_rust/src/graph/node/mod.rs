@@ -21,6 +21,39 @@ pub enum GraphNodeType {
 
     #[serde(rename = "subgraph")]
     Subgraph,
+
+    #[serde(rename = "selector")]
+    Selector,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub enum PatternType {
+    #[serde(rename = "regex")]
+    Regex,
+
+    #[serde(rename = "exact")]
+    Exact,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct PatternMatcher {
+    #[serde(rename = "type")]
+    pub type_: PatternType,
+
+    #[serde(rename = "pattern")]
+    pub pattern: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct SelectorOption {
+    #[serde(rename = "extension", skip_serializing_if = "Option::is_none")]
+    pub extension: Option<PatternMatcher>,
+
+    #[serde(rename = "subgraph", skip_serializing_if = "Option::is_none")]
+    pub subgraph: Option<PatternMatcher>,
+
+    #[serde(rename = "app", skip_serializing_if = "Option::is_none")]
+    pub app: Option<PatternMatcher>,
 }
 
 /// Represents a node in a graph. This struct is completely equivalent to the
@@ -51,6 +84,9 @@ pub struct GraphNode {
     /// for subgraph nodes.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub import_uri: Option<String>,
+
+    #[serde(flatten, skip_serializing_if = "Option::is_none")]
+    pub selector: Option<SelectorOption>,
 }
 
 impl GraphNode {
@@ -80,6 +116,13 @@ impl GraphNode {
                 if self.addon.is_some() {
                     return Err(anyhow::anyhow!(
                         "Subgraph node must not have an addon"
+                    ));
+                }
+            }
+            GraphNodeType::Selector => {
+                if self.selector.is_none() {
+                    return Err(anyhow::anyhow!(
+                        "Selector node must have a selector option"
                     ));
                 }
             }

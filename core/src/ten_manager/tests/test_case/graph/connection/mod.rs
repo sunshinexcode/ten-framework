@@ -23,5 +23,6 @@ pub fn create_test_node(
         app: app.map(|s| s.to_string()),
         property: None,
         import_uri: None,
+        selector: None,
     }
 }

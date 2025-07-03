@@ -91,6 +91,7 @@ impl Graph {
                 app: conn.loc.app.clone(),
                 extension: conn.loc.extension.clone(),
                 subgraph: conn.loc.subgraph.clone(),
+                selector: conn.loc.selector.clone(),
             },
             msg_conversion: None,
         };

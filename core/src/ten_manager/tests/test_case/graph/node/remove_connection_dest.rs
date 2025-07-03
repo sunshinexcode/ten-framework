@@ -115,6 +115,7 @@ mod tests {
             app: None,
             property: None,
             import_uri: None,
+            selector: None,
         };
         let remove_nodes = vec![remove_node];
 

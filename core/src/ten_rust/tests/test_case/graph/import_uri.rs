@@ -103,6 +103,7 @@ mod tests {
                     app: None,
                     property: None,
                     import_uri: None,
+                    selector: None,
                 }],
                 connections: None,
                 exposed_messages: None,
@@ -141,6 +142,7 @@ mod tests {
                         app: None,
                         extension: Some("test_ext".to_string()),
                         subgraph: None,
+                        selector: None,
                     },
                     cmd: Some(vec![GraphMessageFlow::new(
                         "test_cmd".to_string(),

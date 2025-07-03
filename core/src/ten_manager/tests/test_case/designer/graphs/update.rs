@@ -117,6 +117,7 @@ mod tests {
             app: None,
             property: None,
             import_uri: None,
+            selector: None,
         }];
 
         // Create a connection with message flow.
@@ -125,6 +126,7 @@ mod tests {
                 app: None,
                 extension: Some("node2".to_string()),
                 subgraph: None,
+                selector: None,
             },
             msg_conversion: None,
         };
@@ -137,6 +139,7 @@ mod tests {
                 app: None,
                 extension: Some("node1".to_string()),
                 subgraph: None,
+                selector: None,
             },
             cmd: Some(vec![message_flow]),
             data: None,
@@ -349,6 +352,7 @@ mod tests {
             app: Some("http://example.com:8000".to_string()),
             property: None,
             import_uri: None,
+            selector: None,
         }];
         let connections = vec![]; // Empty connections.
 

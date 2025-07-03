@@ -31,6 +31,7 @@ mod tests {
                     app: Some("http://test-app-uri.com".to_string()),
                     property: None,
                     import_uri: None,
+                    selector: None,
                 },
                 GraphNode {
                     type_: GraphNodeType::Extension,
@@ -40,6 +41,7 @@ mod tests {
                     app: Some("http://test-app-uri.com".to_string()),
                     property: None,
                     import_uri: None,
+                    selector: None,
                 },
             ],
             connections: None,
@@ -132,6 +134,7 @@ mod tests {
                     app: Some("http://test-app-uri.com".to_string()),
                     property: None,
                     import_uri: None,
+                    selector: None,
                 },
                 GraphNode {
                     type_: GraphNodeType::Extension,
@@ -141,6 +144,7 @@ mod tests {
                     app: Some("http://test-app-uri.com".to_string()),
                     property: None,
                     import_uri: None,
+                    selector: None,
                 },
             ],
             connections: None,
@@ -193,6 +197,7 @@ mod tests {
                     app: None,
                     property: None,
                     import_uri: None,
+                    selector: None,
                 },
                 GraphNode {
                     type_: GraphNodeType::Extension,
@@ -202,6 +207,7 @@ mod tests {
                     app: None,
                     property: None,
                     import_uri: None,
+                    selector: None,
                 },
             ],
             connections: Some(vec![GraphConnection {
@@ -209,6 +215,7 @@ mod tests {
                     app: None,
                     extension: Some("source_ext".to_string()),
                     subgraph: None,
+                    selector: None,
                 },
                 cmd: Some(vec![GraphMessageFlow::new(
                     "test_cmd".to_string(),
@@ -217,6 +224,7 @@ mod tests {
                             app: None,
                             extension: Some("target_ext".to_string()),
                             subgraph: None,
+                            selector: None,
                         },
                         msg_conversion: None,
                     }],

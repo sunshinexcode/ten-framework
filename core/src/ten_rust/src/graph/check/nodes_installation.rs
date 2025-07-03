@@ -51,6 +51,10 @@ impl Graph {
                     // Subgraph nodes don't need installation checks, skip them
                     continue;
                 }
+                GraphNodeType::Selector => {
+                    // Selector nodes don't need installation checks, skip them
+                    continue;
+                }
             };
 
             if let Some(pkgs_info_in_app) = pkgs_info_in_app {

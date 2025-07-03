@@ -231,6 +231,7 @@ pub async fn graph_add_connection(
             app: dest_app,
             extension: Some(dest_extension),
             subgraph: None,
+            selector: None,
         },
         msg_conversion,
     };
@@ -263,6 +264,7 @@ pub async fn graph_add_connection(
                     app: src_app.clone(),
                     extension: Some(src_extension),
                     subgraph: None,
+                    selector: None,
                 },
                 cmd: None,
                 data: None,

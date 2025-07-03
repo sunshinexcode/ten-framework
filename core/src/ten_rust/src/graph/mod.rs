@@ -269,8 +269,14 @@ impl Graph {
         // Some nodes have 'app' declared and some don't - this is invalid.
         // Because TEN can not determine which app the nodes without the defined
         // field belong to.
+        // Selector nodes are not counted in the nodes_have_declared_app.
         if nodes_have_declared_app != 0
-            && nodes_have_declared_app != self.nodes.len()
+            && nodes_have_declared_app
+                != self
+                    .nodes
+                    .iter()
+                    .filter(|node| node.type_ != GraphNodeType::Selector)
+                    .count()
         {
             return Err(anyhow::anyhow!(ERR_MSG_GRAPH_MIXED_APP_DECLARATIONS));
         }

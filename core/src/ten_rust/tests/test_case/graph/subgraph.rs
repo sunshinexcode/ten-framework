@@ -33,6 +33,7 @@ mod tests {
                     app: None,
                     property: None,
                     import_uri: None,
+                    selector: None,
                 },
                 GraphNode {
                     type_: GraphNodeType::Subgraph,
@@ -47,6 +48,7 @@ mod tests {
                         "file://{}",
                         subgraph_file_path.to_str().unwrap()
                     )),
+                    selector: None,
                 },
             ],
             connections: Some(vec![GraphConnection {
@@ -54,6 +56,7 @@ mod tests {
                     app: None,
                     extension: Some("ext_a".to_string()),
                     subgraph: None,
+                    selector: None,
                 },
                 cmd: Some(vec![connection::GraphMessageFlow::new(
                     "B".to_string(),
@@ -62,6 +65,7 @@ mod tests {
                             app: None,
                             extension: Some("subgraph_1_ext_d".to_string()),
                             subgraph: None,
+                            selector: None,
                         },
                         msg_conversion: None,
                     }],
@@ -86,6 +90,7 @@ mod tests {
                     app: None,
                     property: None,
                     import_uri: None,
+                    selector: None,
                 },
                 GraphNode {
                     type_: GraphNodeType::Extension,
@@ -95,6 +100,7 @@ mod tests {
                     app: None,
                     property: None,
                     import_uri: None,
+                    selector: None,
                 },
             ],
             connections: Some(vec![GraphConnection {
@@ -102,6 +108,7 @@ mod tests {
                     app: None,
                     extension: Some("ext_c".to_string()),
                     subgraph: None,
+                    selector: None,
                 },
                 cmd: Some(vec![connection::GraphMessageFlow::new(
                     "B".to_string(),
@@ -110,6 +117,7 @@ mod tests {
                             app: None,
                             extension: Some("ext_d".to_string()),
                             subgraph: None,
+                            selector: None,
                         },
                         msg_conversion: None,
                     }],
@@ -211,6 +219,7 @@ mod tests {
                     app: None,
                     property: None,
                     import_uri: None,
+                    selector: None,
                 },
                 GraphNode {
                     type_: GraphNodeType::Subgraph,
@@ -223,6 +232,7 @@ mod tests {
                         "file://{}",
                         subgraph_file_path.to_str().unwrap()
                     )),
+                    selector: None,
                 },
             ],
             connections: Some(vec![
@@ -233,6 +243,7 @@ mod tests {
                         app: None,
                         extension: Some("ext_a".to_string()),
                         subgraph: None,
+                        selector: None,
                     },
                     cmd: Some(vec![connection::GraphMessageFlow::new(
                         "B".to_string(),
@@ -241,6 +252,7 @@ mod tests {
                                 app: None,
                                 extension: None,
                                 subgraph: Some("subgraph_2".to_string()),
+                                selector: None,
                             },
                             msg_conversion: None,
                         }],
@@ -257,6 +269,7 @@ mod tests {
                         app: None,
                         extension: None,
                         subgraph: Some("subgraph_2".to_string()),
+                        selector: None,
                     },
                     cmd: Some(vec![connection::GraphMessageFlow::new(
                         "H".to_string(),
@@ -265,6 +278,7 @@ mod tests {
                                 app: None,
                                 extension: Some("ext_a".to_string()),
                                 subgraph: None,
+                                selector: None,
                             },
                             msg_conversion: None,
                         }],
@@ -294,6 +308,7 @@ mod tests {
                     app: None,
                     property: None,
                     import_uri: None,
+                    selector: None,
                 },
                 GraphNode {
                     type_: GraphNodeType::Extension,
@@ -303,6 +318,7 @@ mod tests {
                     app: None,
                     property: None,
                     import_uri: None,
+                    selector: None,
                 },
             ],
             connections: None,
@@ -379,6 +395,7 @@ mod tests {
                     app: None,
                     property: None,
                     import_uri: None,
+                    selector: None,
                 },
                 GraphNode {
                     type_: GraphNodeType::Subgraph,
@@ -391,6 +408,7 @@ mod tests {
                         "file://{}",
                         subgraph_file_path.to_str().unwrap()
                     )),
+                    selector: None,
                 },
             ],
             connections: Some(vec![GraphConnection {
@@ -398,6 +416,7 @@ mod tests {
                     app: None,
                     extension: Some("ext_a".to_string()),
                     subgraph: None,
+                    selector: None,
                 },
                 cmd: Some(vec![connection::GraphMessageFlow::new(
                     "NonExistentCmd".to_string(),
@@ -406,6 +425,7 @@ mod tests {
                             app: None,
                             extension: None,
                             subgraph: Some("subgraph_2".to_string()),
+                            selector: None,
                         },
                         msg_conversion: None,
                     }],
@@ -430,6 +450,7 @@ mod tests {
                 app: None,
                 property: None,
                 import_uri: None,
+                selector: None,
             }],
             connections: None,
             exposed_messages: Some(vec![GraphExposedMessage {
@@ -471,6 +492,7 @@ mod tests {
                     app: None,
                     property: None,
                     import_uri: None,
+                    selector: None,
                 },
                 GraphNode {
                     type_: GraphNodeType::Subgraph,
@@ -483,6 +505,7 @@ mod tests {
                         "file://{}",
                         subgraph_file_path.to_str().unwrap()
                     )),
+                    selector: None,
                 },
             ],
             connections: Some(vec![GraphConnection {
@@ -490,6 +513,7 @@ mod tests {
                     app: None,
                     extension: Some("ext_a".to_string()),
                     subgraph: None,
+                    selector: None,
                 },
                 cmd: Some(vec![connection::GraphMessageFlow::new(
                     "B".to_string(),
@@ -498,6 +522,7 @@ mod tests {
                             app: None,
                             extension: None,
                             subgraph: Some("subgraph_2".to_string()),
+                            selector: None,
                         },
                         msg_conversion: None,
                     }],
@@ -521,6 +546,7 @@ mod tests {
                 app: None,
                 property: None,
                 import_uri: None,
+                selector: None,
             }],
             connections: None,
             exposed_messages: None,
@@ -557,6 +583,7 @@ mod tests {
                     app: None,
                     property: None,
                     import_uri: None,
+                    selector: None,
                 },
                 GraphNode {
                     type_: GraphNodeType::Subgraph,
@@ -569,6 +596,7 @@ mod tests {
                         "file://{}",
                         subgraph1_file_path.to_str().unwrap()
                     )),
+                    selector: None,
                 },
             ],
             connections: Some(vec![GraphConnection {
@@ -576,6 +604,7 @@ mod tests {
                     app: None,
                     extension: Some("ext_a".to_string()),
                     subgraph: None,
+                    selector: None,
                 },
                 cmd: Some(vec![connection::GraphMessageFlow::new(
                     "TestCmd".to_string(),
@@ -586,6 +615,7 @@ mod tests {
                                 "subgraph_1_subgraph_2_ext_z".to_string(),
                             ),
                             subgraph: None,
+                            selector: None,
                         },
                         msg_conversion: None,
                     }],
@@ -610,6 +640,7 @@ mod tests {
                     app: None,
                     property: None,
                     import_uri: None,
+                    selector: None,
                 },
                 GraphNode {
                     type_: GraphNodeType::Subgraph,
@@ -622,6 +653,7 @@ mod tests {
                         "file://{}",
                         subgraph2_file_path.to_str().unwrap()
                     )),
+                    selector: None,
                 },
             ],
             connections: Some(vec![GraphConnection {
@@ -629,6 +661,7 @@ mod tests {
                     app: None,
                     extension: Some("ext_x".to_string()),
                     subgraph: None,
+                    selector: None,
                 },
                 cmd: Some(vec![connection::GraphMessageFlow::new(
                     "InternalCmd".to_string(),
@@ -637,6 +670,7 @@ mod tests {
                             app: None,
                             extension: Some("subgraph_2_ext_z".to_string()),
                             subgraph: None,
+                            selector: None,
                         },
                         msg_conversion: None,
                     }],
@@ -661,6 +695,7 @@ mod tests {
                     app: None,
                     property: None,
                     import_uri: None,
+                    selector: None,
                 },
                 GraphNode {
                     type_: GraphNodeType::Extension,
@@ -670,6 +705,7 @@ mod tests {
                     app: None,
                     property: None,
                     import_uri: None,
+                    selector: None,
                 },
             ],
             connections: Some(vec![GraphConnection {
@@ -677,6 +713,7 @@ mod tests {
                     app: None,
                     extension: Some("ext_y".to_string()),
                     subgraph: None,
+                    selector: None,
                 },
                 cmd: Some(vec![connection::GraphMessageFlow::new(
                     "DeepCmd".to_string(),
@@ -685,6 +722,7 @@ mod tests {
                             app: None,
                             extension: Some("ext_z".to_string()),
                             subgraph: None,
+                            selector: None,
                         },
                         msg_conversion: None,
                     }],
@@ -795,6 +833,7 @@ mod tests {
                     app: None,
                     property: None,
                     import_uri: None,
+                    selector: None,
                 },
                 GraphNode {
                     type_: GraphNodeType::Subgraph,
@@ -807,6 +846,7 @@ mod tests {
                         "file://{}",
                         subgraph1_file_path.to_str().unwrap()
                     )),
+                    selector: None,
                 },
             ],
             connections: Some(vec![GraphConnection {
@@ -814,6 +854,7 @@ mod tests {
                     app: None,
                     extension: Some("ext_a".to_string()),
                     subgraph: None,
+                    selector: None,
                 },
                 cmd: Some(vec![connection::GraphMessageFlow::new(
                     "TestCmd".to_string(),
@@ -822,6 +863,7 @@ mod tests {
                             app: None,
                             extension: None,
                             subgraph: Some("subgraph_1".to_string()),
+                            selector: None,
                         },
                         msg_conversion: None,
                     }],
@@ -846,6 +888,7 @@ mod tests {
                     app: None,
                     property: None,
                     import_uri: None,
+                    selector: None,
                 },
                 GraphNode {
                     type_: GraphNodeType::Subgraph,
@@ -858,6 +901,7 @@ mod tests {
                         "file://{}",
                         subgraph2_file_path.to_str().unwrap()
                     )),
+                    selector: None,
                 },
             ],
             connections: None,
@@ -881,6 +925,7 @@ mod tests {
                     app: None,
                     property: None,
                     import_uri: None,
+                    selector: None,
                 },
                 GraphNode {
                     type_: GraphNodeType::Extension,
@@ -890,6 +935,7 @@ mod tests {
                     app: None,
                     property: None,
                     import_uri: None,
+                    selector: None,
                 },
             ],
             connections: None,
@@ -961,6 +1007,7 @@ mod tests {
                 app: None,
                 property: None,
                 import_uri: None, // Missing import_uri
+                selector: None,
             }],
             connections: None,
             exposed_messages: None,
@@ -993,6 +1040,7 @@ mod tests {
                     app: None,
                     property: None,
                     import_uri: None,
+                    selector: None,
                 },
                 GraphNode {
                     type_: GraphNodeType::Subgraph,
@@ -1005,6 +1053,7 @@ mod tests {
                         "file://{}",
                         subgraph_file_path.to_str().unwrap()
                     )),
+                    selector: None,
                 },
             ],
             connections: Some(vec![
@@ -1014,6 +1063,7 @@ mod tests {
                         app: None,
                         extension: Some("ext_a".to_string()),
                         subgraph: None,
+                        selector: None,
                     },
                     cmd: Some(vec![connection::GraphMessageFlow::new(
                         "TestCmd".to_string(),
@@ -1022,6 +1072,7 @@ mod tests {
                                 app: None,
                                 extension: None,
                                 subgraph: Some("subgraph_3".to_string()),
+                                selector: None,
                             },
                             msg_conversion: None,
                         }],
@@ -1034,6 +1085,7 @@ mod tests {
                                 app: None,
                                 extension: None,
                                 subgraph: Some("subgraph_3".to_string()),
+                                selector: None,
                             },
                             msg_conversion: None,
                         }],
@@ -1046,6 +1098,7 @@ mod tests {
                                 app: None,
                                 extension: None,
                                 subgraph: Some("subgraph_3".to_string()),
+                                selector: None,
                             },
                             msg_conversion: None,
                         }],
@@ -1058,6 +1111,7 @@ mod tests {
                                 app: None,
                                 extension: None,
                                 subgraph: Some("subgraph_3".to_string()),
+                                selector: None,
                             },
                             msg_conversion: None,
                         }],
@@ -1070,6 +1124,7 @@ mod tests {
                         app: None,
                         extension: None,
                         subgraph: Some("subgraph_3".to_string()),
+                        selector: None,
                     },
                     cmd: Some(vec![connection::GraphMessageFlow::new(
                         "ResponseCmd".to_string(),
@@ -1078,6 +1133,7 @@ mod tests {
                                 app: None,
                                 extension: Some("ext_a".to_string()),
                                 subgraph: None,
+                                selector: None,
                             },
                             msg_conversion: None,
                         }],
@@ -1090,6 +1146,7 @@ mod tests {
                                 app: None,
                                 extension: Some("ext_a".to_string()),
                                 subgraph: None,
+                                selector: None,
                             },
                             msg_conversion: None,
                         }],
@@ -1102,6 +1159,7 @@ mod tests {
                                 app: None,
                                 extension: Some("ext_a".to_string()),
                                 subgraph: None,
+                                selector: None,
                             },
                             msg_conversion: None,
                         }],
@@ -1114,6 +1172,7 @@ mod tests {
                                 app: None,
                                 extension: Some("ext_a".to_string()),
                                 subgraph: None,
+                                selector: None,
                             },
                             msg_conversion: None,
                         }],
@@ -1136,6 +1195,7 @@ mod tests {
                     app: None,
                     property: None,
                     import_uri: None,
+                    selector: None,
                 },
                 GraphNode {
                     type_: GraphNodeType::Extension,
@@ -1145,6 +1205,7 @@ mod tests {
                     app: None,
                     property: None,
                     import_uri: None,
+                    selector: None,
                 },
             ],
             connections: None,
@@ -1315,6 +1376,7 @@ mod tests {
                     app: None,
                     property: None,
                     import_uri: None,
+                    selector: None,
                 },
                 GraphNode {
                     type_: GraphNodeType::Subgraph,
@@ -1327,6 +1389,7 @@ mod tests {
                         "file://{}",
                         subgraph_file_path.to_str().unwrap()
                     )),
+                    selector: None,
                 },
             ],
             connections: None,
@@ -1358,6 +1421,7 @@ mod tests {
                     app: None,
                     property: None,
                     import_uri: None,
+                    selector: None,
                 },
                 GraphNode {
                     type_: GraphNodeType::Extension,
@@ -1367,6 +1431,7 @@ mod tests {
                     app: None,
                     property: None,
                     import_uri: None,
+                    selector: None,
                 },
             ],
             connections: None,

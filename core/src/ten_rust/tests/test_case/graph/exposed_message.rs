@@ -27,6 +27,7 @@ mod tests {
                     app: None,
                     property: None,
                     import_uri: None,
+                    selector: None,
                 },
                 GraphNode {
                     type_: GraphNodeType::Extension,
@@ -36,6 +37,7 @@ mod tests {
                     app: None,
                     property: None,
                     import_uri: None,
+                    selector: None,
                 },
             ],
             connections: Some(vec![GraphConnection {
@@ -43,6 +45,7 @@ mod tests {
                     extension: Some("ext_c".to_string()),
                     app: None,
                     subgraph: None,
+                    selector: None,
                 },
                 cmd: Some(vec![GraphMessageFlow::new(
                     "B".to_string(),
@@ -51,6 +54,7 @@ mod tests {
                             extension: Some("ext_d".to_string()),
                             subgraph: None,
                             app: None,
+                            selector: None,
                         },
                         msg_conversion: None,
                     }],

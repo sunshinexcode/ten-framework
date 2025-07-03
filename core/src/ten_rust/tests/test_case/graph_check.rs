@@ -238,6 +238,7 @@ mod tests {
                     app: None,
                     property: None,
                     import_uri: None,
+                    selector: None,
                 },
                 GraphNode {
                     type_: GraphNodeType::Subgraph,
@@ -247,6 +248,7 @@ mod tests {
                     app: None,
                     property: None,
                     import_uri: Some("/tmp/subgraph.json".to_string()),
+                    selector: None,
                 },
             ],
             connections: Some(vec![GraphConnection {
@@ -254,6 +256,7 @@ mod tests {
                     app: None,
                     extension: Some("ext_a".to_string()),
                     subgraph: None,
+                    selector: None,
                 },
                 cmd: Some(vec![GraphMessageFlow::new(
                     "test_cmd".to_string(),
@@ -262,6 +265,7 @@ mod tests {
                             app: None,
                             extension: Some("subgraph_1:ext_b".to_string()),
                             subgraph: None,
+                            selector: None,
                         },
                         msg_conversion: None,
                     }],

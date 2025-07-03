@@ -13,6 +13,92 @@
         6
       ]
     },
+    "mutuallyExclusiveFieldsRule": {
+      "oneOf": [
+        {
+          "required": [
+            "extension"
+          ],
+          "not": {
+            "anyOf": [
+              {
+                "required": [
+                  "subgraph"
+                ]
+              },
+              {
+                "required": [
+                  "selector"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "required": [
+            "subgraph"
+          ],
+          "not": {
+            "anyOf": [
+              {
+                "required": [
+                  "extension"
+                ]
+              },
+              {
+                "required": [
+                  "selector"
+                ]
+              },
+              {
+                "required": [
+                  "app"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "required": [
+            "selector"
+          ],
+          "not": {
+            "anyOf": [
+              {
+                "required": [
+                  "extension"
+                ]
+              },
+              {
+                "required": [
+                  "subgraph"
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "patternMatcher": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "pattern"
+      ],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "regex",
+            "exact"
+          ]
+        },
+        "pattern": {
+          "type": "string"
+        }
+      }
+    },
     "non_empty_non_localhost_uri": {
       "type": "string",
       "format": "uri",
@@ -78,30 +164,16 @@
         "subgraph": {
           "$ref": "#/$defs/alphanumericCharacters"
         },
+        "selector": {
+          "$ref": "#/$defs/alphanumericCharacters"
+        },
         "msg_conversion": {
           "$ref": "#/$defs/msgConversion"
         }
       },
-      "oneOf": [
+      "allOf": [
         {
-          "required": [
-            "extension"
-          ],
-          "not": {
-            "required": [
-              "subgraph"
-            ]
-          }
-        },
-        {
-          "required": [
-            "subgraph"
-          ],
-          "not": {
-            "required": [
-              "extension"
-            ]
-          }
+          "$ref": "#/$defs/mutuallyExclusiveFieldsRule"
         }
       ]
     },
@@ -117,28 +189,14 @@
         },
         "subgraph": {
           "$ref": "#/$defs/alphanumericCharacters"
+        },
+        "selector": {
+          "$ref": "#/$defs/alphanumericCharacters"
         }
       },
-      "oneOf": [
+      "allOf": [
         {
-          "required": [
-            "extension"
-          ],
-          "not": {
-            "required": [
-              "subgraph"
-            ]
-          }
-        },
-        {
-          "required": [
-            "subgraph"
-          ],
-          "not": {
-            "required": [
-              "extension"
-            ]
-          }
+          "$ref": "#/$defs/mutuallyExclusiveFieldsRule"
         }
       ]
     },
@@ -154,7 +212,8 @@
           "type": "string",
           "enum": [
             "extension",
-            "subgraph"
+            "subgraph",
+            "selector"
           ]
         },
         "name": {
@@ -164,7 +223,20 @@
           "$ref": "#/$defs/alphanumericCharacters"
         },
         "app": {
-          "$ref": "#/$defs/notEmptyString"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/notEmptyString"
+            },
+            {
+              "$ref": "#/$defs/patternMatcher"
+            }
+          ]
+        },
+        "extension": {
+          "$ref": "#/$defs/patternMatcher"
+        },
+        "subgraph": {
+          "$ref": "#/$defs/patternMatcher"
         },
         "extension_group": {
           "$ref": "#/$defs/alphanumericCharacters"
@@ -176,7 +248,7 @@
         },
         "property": {
           "type": "object",
-          "propertyNames": { // The property name should be alphanumericCharacters.
+          "propertyNames": {
             "$ref": "#/$defs/alphanumericCharacters"
           },
           "patternProperties": {
@@ -242,6 +314,63 @@
                 "addon"
               ]
             }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "selector"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "oneOf": [
+              {
+                "allOf": [
+                  {
+                    "required": [
+                      "extension"
+                    ]
+                  },
+                  {
+                    "not": {
+                      "required": [
+                        "subgraph"
+                      ]
+                    }
+                  }
+                ]
+              },
+              {
+                "allOf": [
+                  {
+                    "required": [
+                      "subgraph"
+                    ]
+                  },
+                  {
+                    "not": {
+                      "anyOf": [
+                        {
+                          "required": [
+                            "extension"
+                          ]
+                        },
+                        {
+                          "required": [
+                            "app"
+                          ]
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            ]
           }
         }
       ]
@@ -416,7 +545,7 @@
             "$ref": "#/$defs/msgSources"
           }
         },
-        "oneOf": [
+        "anyOf": [
           {
             "required": [
               "dest"
@@ -449,7 +578,7 @@
             "$ref": "#/$defs/msgSources"
           }
         },
-        "oneOf": [
+        "anyOf": [
           {
             "required": [
               "dest"

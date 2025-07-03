@@ -29,6 +29,7 @@ mod tests {
             app: app.map(|s| s.to_string()),
             property: None,
             import_uri: None,
+            selector: None,
         }
     }
 
@@ -44,6 +45,7 @@ mod tests {
                 app: dest_app.map(|s| s.to_string()),
                 extension: Some(dest_extension.to_string()),
                 subgraph: None,
+                selector: None,
             },
             msg_conversion: None,
         };
@@ -56,6 +58,7 @@ mod tests {
                 app: app.map(|s| s.to_string()),
                 extension: Some(extension.to_string()),
                 subgraph: None,
+                selector: None,
             },
             cmd: Some(vec![message_flow]),
             data: None,
@@ -206,6 +209,7 @@ mod tests {
                 app: Some("app1".to_string()),
                 extension: Some("ext1".to_string()),
                 subgraph: None,
+                selector: None,
             },
             cmd: Some(vec![GraphMessageFlow::new(
                 "cmd1".to_string(),
@@ -214,6 +218,7 @@ mod tests {
                         app: Some("app1".to_string()),
                         extension: Some("ext2".to_string()),
                         subgraph: None,
+                        selector: None,
                     },
                     msg_conversion: None,
                 }],
@@ -226,6 +231,7 @@ mod tests {
                         app: Some("app1".to_string()),
                         extension: Some("ext2".to_string()),
                         subgraph: None,
+                        selector: None,
                     },
                     msg_conversion: None,
                 }],
@@ -238,6 +244,7 @@ mod tests {
                         app: Some("app1".to_string()),
                         extension: Some("ext2".to_string()),
                         subgraph: None,
+                        selector: None,
                     },
                     msg_conversion: None,
                 }],
@@ -250,6 +257,7 @@ mod tests {
                         app: Some("app1".to_string()),
                         extension: Some("ext2".to_string()),
                         subgraph: None,
+                        selector: None,
                     },
                     msg_conversion: None,
                 }],

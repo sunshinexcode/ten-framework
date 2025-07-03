@@ -43,6 +43,7 @@ impl GraphNodeForUpdate {
             app: self.app.clone(),
             property: self.property.clone(),
             import_uri: None,
+            selector: None,
         }
     }
 }

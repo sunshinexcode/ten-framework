@@ -145,6 +145,7 @@ impl Graph {
                         app: base_connection.loc.app.clone(),
                         extension: Some(extension_name),
                         subgraph: None,
+                        selector: None,
                     },
                     cmd: None,
                     data: None,
@@ -647,6 +648,10 @@ impl Graph {
                         subgraph_mappings,
                     )
                     .await?;
+                }
+                GraphNodeType::Selector => {
+                    // TODO(xilin): Implement selector node flattening
+                    continue;
                 }
             }
         }

@@ -83,6 +83,7 @@ impl From<GraphNodesSingleResponseData> for GraphNode {
             app: designer_extension.app,
             property: designer_extension.property,
             import_uri: None,
+            selector: None,
         }
     }
 }

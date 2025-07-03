@@ -23,7 +23,10 @@ mod tests {
             ERR_MSG_GRAPH_LOCALHOST_FORBIDDEN_IN_MULTI_APP_MODE,
             ERR_MSG_GRAPH_LOCALHOST_FORBIDDEN_IN_SINGLE_APP_MODE,
         },
-        graph::Graph,
+        graph::{
+            node::{GraphNodeType, PatternType},
+            Graph,
+        },
         pkg_info::property::parse_property_from_str,
     };
 
@@ -567,6 +570,42 @@ mod tests {
         let msg = result.err().unwrap().to_string();
         assert!(
             msg.contains("result conversion is not allowed for data out msg")
+        );
+    }
+
+    #[tokio::test]
+    async fn test_graph_with_selector_1() {
+        let graph_str = include_str!(
+            "../../test_data/graph_with_selector/graph_with_selector_1.json"
+        );
+
+        let graph = Graph::from_str_and_validate(graph_str).unwrap();
+
+        // Check the selector node.
+        let selector_node = &graph
+            .nodes
+            .iter()
+            .find(|node| node.type_ == GraphNodeType::Selector)
+            .unwrap();
+        assert_eq!(selector_node.name, "selector_for_ext_1_and_2");
+
+        let selector_option = &selector_node.selector.as_ref().unwrap();
+        assert_eq!(
+            selector_option.extension.as_ref().unwrap().type_,
+            PatternType::Regex
+        );
+        assert_eq!(
+            selector_option.extension.as_ref().unwrap().pattern,
+            "test_extension_[1-2]"
+        );
+
+        assert_eq!(
+            selector_option.app.as_ref().unwrap().type_,
+            PatternType::Exact
+        );
+        assert_eq!(
+            selector_option.app.as_ref().unwrap().pattern,
+            "msgpack://127.0.0.1:8001/"
         );
     }
 }

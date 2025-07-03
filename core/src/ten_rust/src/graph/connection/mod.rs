@@ -30,11 +30,14 @@ pub struct GraphLoc {
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub subgraph: Option<String>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub selector: Option<String>,
 }
 
 impl GraphLoc {
     pub fn new() -> Self {
-        Self { app: None, extension: None, subgraph: None }
+        Self { app: None, extension: None, subgraph: None, selector: None }
     }
 
     pub fn with_app_and_extension_or_subgraph(
@@ -42,7 +45,7 @@ impl GraphLoc {
         extension: Option<String>,
         subgraph: Option<String>,
     ) -> Self {
-        Self { app, extension, subgraph }
+        Self { app, extension, subgraph, selector: None }
     }
 
     pub fn get_app_uri(&self) -> &Option<String> {
@@ -76,9 +79,11 @@ impl GraphLoc {
                 ));
             }
         } else {
-            // If nodes have declared app, locations must also declare it.
+            // If nodes have declared app and the location is not a selector,
+            // locations must also declare the app.
             if *app_uri_declaration_state
                 != AppUriDeclarationState::NoneDeclared
+                && self.selector.is_none()
             {
                 return Err(anyhow::anyhow!(
                     ERR_MSG_GRAPH_APP_FIELD_SHOULD_BE_DECLARED

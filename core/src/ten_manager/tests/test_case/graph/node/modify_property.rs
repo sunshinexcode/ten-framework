@@ -51,6 +51,7 @@ mod tests {
                     "newSetting": "added-value"
                 })),
                 import_uri: None,
+                selector: None,
             },
             // Node2 with modified property
             GraphNode {
@@ -63,6 +64,7 @@ mod tests {
                     "config": "updated-config"
                 })),
                 import_uri: None,
+                selector: None,
             },
             // Non-existent node (should not affect anything)
             GraphNode {
@@ -75,6 +77,7 @@ mod tests {
                   "test": "value"
                 })),
                 import_uri: None,
+                selector: None,
             },
             // Node with mismatched app field (should not update)
             GraphNode {
@@ -87,6 +90,7 @@ mod tests {
                     "enabled": false
                 })),
                 import_uri: None,
+                selector: None,
             },
         ];
 

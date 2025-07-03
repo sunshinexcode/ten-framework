@@ -57,6 +57,7 @@ pub async fn graph_add_extension_node(
         app: app.clone(),
         property: property.clone(),
         import_uri: None,
+        selector: None,
     };
 
     // Add the node to the graph.
