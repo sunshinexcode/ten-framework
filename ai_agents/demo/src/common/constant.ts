@@ -111,6 +111,10 @@ export const GRAPH_OPTIONS: GraphOptionItem[] = [
   //   value: "va_nova_multimodal_aws",
   // },
   {
+    label: "Shisa",
+    value: "shisa_llm",
+  },
+  {
     label: "With TEN Turn Detection",
     value: "with_ten_turn_detection",
   },
