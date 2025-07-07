@@ -182,6 +182,11 @@
       "type": "extension",
       "name": "azure_asr_python",
       "version": "=0.1.0"
+    },
+    {
+      "type": "extension",
+      "name": "speechmatics_asr_python",
+      "version": "=0.1.0"
     }
   ],
   "scripts": {

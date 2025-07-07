@@ -287,13 +287,17 @@ class AzureASRExtension(AsyncASRBaseExtension):
         return self.connected and self.client is not None
 
     async def finalize(self, session_id: str | None) -> None:
-        self.last_finalize_timestamp = int(datetime.now().timestamp() * 1000)
-        self.ten_env.log_debug(
-            f"azure drain start at {self.last_finalize_timestamp} session_id: {session_id}"
-        )
+        # self.last_finalize_timestamp = int(datetime.now().timestamp() * 1000)
+        # self.ten_env.log_debug(
+        #     f"azure drain start at {self.last_finalize_timestamp} session_id: {session_id}"
+        # )
 
         # TODO
         # await self.client.finalize()
+
+        raise NotImplementedError(
+            "Azure ASR has no finalize method yet."
+        )
 
     async def _finalize_counter_if_needed(self, is_final: bool) -> None:
         if is_final and self.last_finalize_timestamp != 0:
