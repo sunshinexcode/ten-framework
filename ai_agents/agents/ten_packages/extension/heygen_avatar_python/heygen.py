@@ -344,20 +344,20 @@ class AgoraHeygenRecorder:
         self._speak_end_timer_task = asyncio.create_task(self._debounced_speak_end())
 
     async def _debounced_speak_end(self):
-        """Wait 1.0 seconds, then send speak_end if not cancelled"""
+        """Wait 0.5 seconds, then send speak_end if not cancelled"""
         try:
-            await asyncio.sleep(1.0)
+            await asyncio.sleep(0.5)
             # If we reach here, 500ms passed without being cancelled
             if self.websocket is not None:
                 end_evt_id = str(uuid.uuid4())
-                await self.websocket.send(json.dumps({
-                    "type": "agent.speak_end",
-                    "event_id": end_evt_id
-                }))
-                self.ten_env.log_info("Sent agent.speak_end.")
+                #await self.websocket.send(json.dumps({
+                #    "type": "agent.speak_end",
+                #    "event_id": end_evt_id
+                #}))
+                self.ten_env.log_info("BW2 Sent agent.speak_end.")
         except asyncio.CancelledError:
             # Task was cancelled because new audio was sent
-            self.ten_env.log_debug("speak_end cancelled due to new audio")
+            self.ten_env.log_info("BW2 speak_end cancelled due to new audio")
         except Exception as e:
             self.ten_env.log_error(f"Error in speak_end task: {e}")
 
@@ -372,14 +372,14 @@ class AgoraHeygenRecorder:
         # If there's no speak_end scheduled yet and new audio arrives, send interrupt
         if no_speak_end_scheduled:
             try:
-                self.ten_env.log_info("Interrupting active speech (no speak_end scheduled) before sending new TTS")
+                self.ten_env.log_info("BW2 Interrupting active speech (no speak_end scheduled) before sending new TTS")
                 await self.interrupt()
             except Exception as e:
-                self.ten_env.log_error(f"Failed to interrupt active speech: {e}")
+                self.ten_env.log_error(f"BW2 Failed to interrupt active speech: {e}")
                 # Continue anyway to send the new audio
         else:
             # There's already a speak_end scheduled, so cancel it
-            self.ten_env.log_info("Cancelling existing speak_end timer for new TTS")
+            self.ten_env.log_info("BW2 Cancelling existing speak_end timer for new TTS")
             self._speak_end_timer_task.cancel()
         
         # Send the new audio
