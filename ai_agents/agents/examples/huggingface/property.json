@@ -246,7 +246,7 @@
               "greeting": "TEN Agent connected. How can I help you today?",
               "max_memory_length": 10,
               "max_tokens": 512,
-              "model": "${env:OPENAI_MODEL}",
+              "model": "shisa-v2-qwen2.5-7b",
               "prompt": "",
               "proxy_url": "${env:OPENAI_PROXY_URL|}"
             }
