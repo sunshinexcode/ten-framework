@@ -49,17 +49,17 @@ export const LANGUAGE_OPTIONS: LanguageOptionItem[] = [
     value: "en-US",
   },
   {
-    label: "Chinese",
+    label: "中文",
     value: "zh-CN",
   },
   // {
   //   label: "Korean",
   //   value: "ko-KR",
   // },
-  // {
-  //   label: "Japanese",
-  //   value: "ja-JP",
-  // },
+  {
+    label: "日本語",
+    value: "ja-JP",
+  }
 ]
 export const GRAPH_OPTIONS: GraphOptionItem[] = [
   // {
@@ -114,17 +114,17 @@ export const GRAPH_OPTIONS: GraphOptionItem[] = [
     label: "Shisa",
     value: "Shisa",
   },
-  // {
-  //   label: "With TEN Turn Detection",
-  //   value: "with_ten_turn_detection",
-  // },
-  // {
-  //   label: "Without TEN Turn Detection and TEN VAD",
-  //   value: "without_ten_turn_detection_and_ten_vad",
-  // },
   {
     label: "VAD and Turn Detection",
     value: "with_ten_turn_detection_and_ten_vad",
+  },
+  {
+    label: "With TEN Turn Detection",
+    value: "with_ten_turn_detection",
+  },
+  {
+    label: "Without TEN Turn Detection and TEN VAD",
+    value: "without_ten_turn_detection_and_ten_vad",
   },
 ]
 
