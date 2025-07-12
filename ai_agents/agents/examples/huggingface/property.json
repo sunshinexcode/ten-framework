@@ -240,15 +240,15 @@
             "addon": "openai_chatgpt_python",
             "extension_group": "chatgpt",
             "property": {
-              "api_key": "${env:OPENAI_API_KEY}",
-              "base_url": "${env:OPENAI_API_BASE|}",
+              "api_key": "${env:SHISA_API_KEY}",
+              "base_url": "${env:SHISA_API_BASE|}",
               "frequency_penalty": 0.9,
               "greeting": "TEN Agent connected. How can I help you today?",
               "max_memory_length": 10,
               "max_tokens": 512,
-              "model": "${env:OPENAI_MODEL}",
+              "model": "${env:SHISA_MODEL}",
               "prompt": "",
-              "proxy_url": "${env:OPENAI_PROXY_URL|}"
+              "proxy_url": "${env:SHISA_PROXY_URL|}"
             }
           },
           {

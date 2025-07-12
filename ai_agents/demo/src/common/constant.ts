@@ -136,6 +136,31 @@ export const isLanguageSupported = (graphName: string) => {
   return !["va_gemini_v2v"].includes(graphName)
 }
 
+export const getAvailableLanguages = (graphName: string): LanguageOptionItem[] => {
+  const baseLanguages: LanguageOptionItem[] = [
+    {
+      label: "English",
+      value: "en-US" as const,
+    },
+    {
+      label: "中文",
+      value: "zh-CN" as const,
+    },
+  ]
+
+  if (graphName === "Shisa") {
+    return [
+      ...baseLanguages,
+      {
+        label: "日本語",
+        value: "ja-JP" as const,
+      }
+    ]
+  }
+
+  return baseLanguages
+}
+
 export const isVoiceGenderSupported = (graphName: string) => {
   return !["va_gemini_v2v"].includes(graphName)
 }
