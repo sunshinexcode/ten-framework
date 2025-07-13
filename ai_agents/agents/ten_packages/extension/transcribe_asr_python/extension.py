@@ -1,4 +1,5 @@
 import traceback
+from typing import Awaitable, Callable
 from pydantic import BaseModel
 from ten_ai_base.asr import AsyncASRBaseExtension
 from ten_ai_base.message import ErrorMessage, ModuleType
@@ -12,14 +13,10 @@ from ten_runtime import (
 )
 
 import asyncio
-from amazon_transcribe.auth import StaticCredentialResolver
-from amazon_transcribe.client import TranscribeStreamingClient
-from amazon_transcribe.handlers import TranscriptResultStreamHandler
-from amazon_transcribe.model import (
-    TranscriptEvent,
-    TranscriptResultStream,
-    StartStreamTranscriptionEventStream,
-)
+import amazon_transcribe.auth
+import amazon_transcribe.client
+import amazon_transcribe.handlers
+import amazon_transcribe.model
 from dataclasses import dataclass
 
 
@@ -37,10 +34,10 @@ class TranscribeASRExtension(AsyncASRBaseExtension):
     def __init__(self, name: str):
         super().__init__(name)
         self.config: TranscribeASRConfig = None
-        self.client: TranscribeStreamingClient = None
-        self.stream: StartStreamTranscriptionEventStream = None
+        self.client: amazon_transcribe.client.TranscribeStreamingClient = None
+        self.stream: amazon_transcribe.model.StartStreamTranscriptionEventStream = None
         self.handler_task: asyncio.Task = None
-        self.event_handler: TranscribeEventHandler = None
+        self.event_handler = None
 
     async def on_init(self, ten_env: AsyncTenEnv) -> None:
         ten_env.log_info("TranscribeASRExtension on_init")
@@ -58,29 +55,30 @@ class TranscribeASRExtension(AsyncASRBaseExtension):
             self.config = TranscribeASRConfig.model_validate_json(config_json)
 
             if self.config.access_key and self.config.secret_key:
-                self.client = TranscribeStreamingClient(
+                self.client = amazon_transcribe.client.TranscribeStreamingClient(
                     region=self.config.region,
-                    credential_resolver=StaticCredentialResolver(
+                    credential_resolver=amazon_transcribe.auth.StaticCredentialResolver(
                         access_key_id=self.config.access_key,
                         secret_access_key=self.config.secret_key,
                     ),
                 )
             else:
-                self.client = TranscribeStreamingClient(region=self.config.region)
+                self.client = amazon_transcribe.client.TranscribeStreamingClient(region=self.config.region)
 
             self.stream = await self.client.start_stream_transcription(
                 language_code=self.config.lang_code,
                 media_sample_rate_hz=self.config.sample_rate,
                 media_encoding=self.config.media_encoding,
             )
+
+
             self.event_handler = TranscribeEventHandler(
                 self.stream.output_stream, self.ten_env, self.session_id, self.config.lang_code
             )
+            self.event_handler.on_transcript_event_cb = self.on_transcript_event
             self.handler_task = asyncio.create_task(self.event_handler.handle_events())
 
             self.ten_env.log_info("Transcribe stream started")
-            if self.event_handler:
-                self.event_handler.session_id = self.session_id
 
         except Exception as e:
             self.ten_env.log_error(f"start_connection error: {traceback.format_exc()}")
@@ -106,8 +104,6 @@ class TranscribeASRExtension(AsyncASRBaseExtension):
     async def send_audio(self, frame: AudioFrame, session_id: str | None) -> None:
         self.session_id = session_id or self.session_id
         frame_buf = frame.get_buf()
-        if self.event_handler:
-            self.event_handler.session_id = self.session_id
         if frame_buf:
             await self.stream.input_stream.send_audio_event(audio_chunk=frame_buf)
 
@@ -125,21 +121,7 @@ class TranscribeASRExtension(AsyncASRBaseExtension):
         self.ten_env.log_info("Attempting reconnect...")
         await self.start_connection()
 
-
-class TranscribeEventHandler(TranscriptResultStreamHandler):
-    def __init__(
-        self,
-        transcript_result_stream: TranscriptResultStream,
-        ten_env: AsyncTenEnv,
-        session_id: str,
-        lang_code: str = "en-US",
-    ):
-        super().__init__(transcript_result_stream)
-        self.ten_env = ten_env
-        self.session_id: str = session_id
-        self.lang_code:str = lang_code
-
-    async def handle_transcript_event(self, transcript_event: TranscriptEvent) -> None:
+    async def on_transcript_event(self, transcript_event: amazon_transcribe.model.TranscriptEvent) -> None:
         try:
             text_result = ""
             is_final = True
@@ -160,9 +142,27 @@ class TranscribeEventHandler(TranscriptResultStreamHandler):
                 final=is_final,
                 start_ms=0,
                 duration_ms=0,
-                language=self.lang_code,
+                language=self.config.lang_code,
                 metadata={"session_id": self.session_id},
             )
-            await self.ten_env.send_data(transcription)
+            await self.send_asr_transcription(transcription)
         except Exception as e:
             self.ten_env.log_error(f"handle_transcript_event error: {e}")
+
+class TranscribeEventHandler(amazon_transcribe.handlers.TranscriptResultStreamHandler):
+    def __init__(
+        self,
+        transcript_result_stream: amazon_transcribe.model.TranscriptResultStream,
+        ten_env: AsyncTenEnv,
+    ):
+        super().__init__(transcript_result_stream)
+        self.ten_env = ten_env
+        self.on_transcript_event_cb: (
+            Callable[[amazon_transcribe.model.TranscriptEvent], Awaitable[None]] | None
+        ) = None
+
+    async def handle_transcript_event(self, transcript_event: amazon_transcribe.model.TranscriptEvent) -> None:
+        if self.on_transcript_event_cb:
+            await self.on_transcript_event_cb(transcript_event)
+        else:
+            self.ten_env.log_warn("No handler registered for transcript event.")
