@@ -1,126 +1,168 @@
+import traceback
+from pydantic import BaseModel
 from ten_ai_base.asr import AsyncASRBaseExtension
+from ten_ai_base.message import ErrorMessage, ModuleType
+from ten_ai_base.transcription import UserTranscription
 from ten_runtime import (
-    Extension,
-    TenEnv,
-    Cmd,
+    AsyncTenEnv,
     AudioFrame,
+    Cmd,
     StatusCode,
     CmdResult,
 )
 
 import asyncio
-import threading
+from amazon_transcribe.auth import StaticCredentialResolver
+from amazon_transcribe.client import TranscribeStreamingClient
+from amazon_transcribe.handlers import TranscriptResultStreamHandler
+from amazon_transcribe.model import (
+    TranscriptEvent,
+    TranscriptResultStream,
+    StartStreamTranscriptionEventStream,
+)
+from dataclasses import dataclass
 
-from .transcribe_wrapper import AsyncTranscribeWrapper, TranscribeConfig
 
-PROPERTY_REGION = "region"  # Optional
-PROPERTY_ACCESS_KEY = "access_key"  # Optional
-PROPERTY_SECRET_KEY = "secret_key"  # Optional
-PROPERTY_SAMPLE_RATE = "sample_rate"  # Optional
-PROPERTY_LANG_CODE = "lang_code"  # Optional
+@dataclass
+class TranscribeASRConfig(BaseModel):
+    region: str = "us-east-1"
+    access_key: str = ""
+    secret_key: str = ""
+    sample_rate: int = 16000
+    lang_code: str = "en-US"
+    media_encoding: str = "pcm"
 
 
-class TranscribeAsrExtension(AsyncASRBaseExtension):
+class TranscribeASRExtension(AsyncASRBaseExtension):
     def __init__(self, name: str):
         super().__init__(name)
+        self.config: TranscribeASRConfig = None
+        self.client: TranscribeStreamingClient = None
+        self.stream: StartStreamTranscriptionEventStream = None
+        self.handler_task: asyncio.Task = None
+        self.event_handler: TranscribeEventHandler = None
 
-        self.queue = asyncio.Queue(
-            maxsize=3000
-        )  # about 3000 * 10ms = 30s input
-        self.transcribe = None
+    async def on_init(self, ten_env: AsyncTenEnv) -> None:
+        ten_env.log_info("TranscribeASRExtension on_init")
 
-    async def _handle_reconnect(self):
-        await asyncio.sleep(0.2)  # Adjust the sleep time as needed
-        await self.stop_connection()
-        await self.start_connection()
-
-    def put_pcm_frame(self, ten: TenEnv, pcm_frame: AudioFrame) -> None:
-        if self.stopped:
-            return
-
-        try:
-            # Use a simpler synchronous approach with put_nowait
-            if not self.loop.is_closed():
-                if self.queue.qsize() < self.queue.maxsize:
-                    self.loop.call_soon_threadsafe(
-                        self.queue.put_nowait, pcm_frame
-                    )
-                else:
-                    ten.log_error("Queue is full, dropping frame")
-            else:
-                ten.log_error("Event loop is closed, cannot process frame")
-        except Exception as e:
-            import traceback
-
-            error_msg = f"Error putting frame in queue: {str(e)}\n{traceback.format_exc()}"
-            ten.log_error(error_msg)
-
-    def on_audio_frame(self, ten: TenEnv, frame: AudioFrame) -> None:
-        self.put_pcm_frame(ten, pcm_frame=frame)
-
-    def on_stop(self, ten: TenEnv) -> None:
-        ten.log_info("TranscribeAsrExtension on_stop")
-
-        # put an empty frame to stop transcribe_wrapper
-        self.put_pcm_frame(ten, None)
-        self.stopped = True
-        self.thread.join()
-        self.loop.stop()
-        self.loop.close()
-
-        ten.on_stop_done()
-
-    def on_cmd(self, ten: TenEnv, cmd: Cmd) -> None:
-        ten.log_info("TranscribeAsrExtension on_cmd")
-        cmd_json = cmd.to_json()
-        ten.log_info(f"TranscribeAsrExtension on_cmd json: {cmd_json}")
-
-        cmdName = cmd.get_name()
-        ten.log_info(f"got cmd {cmdName}")
-
+    async def on_cmd(self, ten_env: AsyncTenEnv, cmd: Cmd) -> None:
+        cmd_json, _ = cmd.get_property_to_json()
+        ten_env.log_info(f"on_cmd json: {cmd_json}")
         cmd_result = CmdResult.create(StatusCode.OK, cmd)
         cmd_result.set_property_string("detail", "success")
-        ten.return_result(cmd_result)
+        await ten_env.return_result(cmd_result)
 
     async def start_connection(self) -> None:
-        self.ten_env.log_info("TranscribeAsrExtension on_start")
+        try:
+            config_json, _ = await self.ten_env.get_property_to_json("")
+            self.config = TranscribeASRConfig.model_validate_json(config_json)
 
-        transcribe_config = TranscribeConfig.default_config()
-
-        for optional_param in [
-            PROPERTY_REGION,
-            PROPERTY_SAMPLE_RATE,
-            PROPERTY_LANG_CODE,
-            PROPERTY_ACCESS_KEY,
-            PROPERTY_SECRET_KEY,
-        ]:
-            try:
-                value, _ = ten.get_property_string(optional_param).strip()
-                if value:
-                    transcribe_config.__setattr__(optional_param, value)
-            except Exception as err:
-                ten.log_debug(
-                    f"GetProperty optional {optional_param} failed, err: {err}. Using default value: {transcribe_config.__getattribute__(optional_param)}"
+            if self.config.access_key and self.config.secret_key:
+                self.client = TranscribeStreamingClient(
+                    region=self.config.region,
+                    credential_resolver=StaticCredentialResolver(
+                        access_key_id=self.config.access_key,
+                        secret_access_key=self.config.secret_key,
+                    ),
                 )
+            else:
+                self.client = TranscribeStreamingClient(region=self.config.region)
 
-        loop = asyncio.get_event_loop()
-        self.transcribe = AsyncTranscribeWrapper(
-            transcribe_config, self.queue, self.ten_env, loop
-        )
+            self.stream = await self.client.start_stream_transcription(
+                language_code=self.config.lang_code,
+                media_sample_rate_hz=self.config.sample_rate,
+                media_encoding=self.config.media_encoding,
+            )
+            self.event_handler = TranscribeEventHandler(
+                self.stream.output_stream, self.ten_env, self.session_id, self.config.lang_code
+            )
+            self.handler_task = asyncio.create_task(self.event_handler.handle_events())
 
-        await asyncio.to_thread(self.transcribe.run)
+            self.ten_env.log_info("Transcribe stream started")
+            if self.event_handler:
+                self.event_handler.session_id = self.session_id
 
+        except Exception as e:
+            self.ten_env.log_error(f"start_connection error: {traceback.format_exc()}")
+            await self.send_asr_error(
+                ErrorMessage(
+                    code=1,
+                    message=str(e),
+                    turn_id=0,
+                    module=ModuleType.STT,
+                )
+            )
+            asyncio.create_task(self._handle_reconnect())
 
     async def stop_connection(self) -> None:
-        return await super().stop_connection()
+        if self.stream:
+            await self.stream.input_stream.end_stream()
+            self.stream = None
+        if self.handler_task:
+            await self.handler_task
+            self.handler_task = None
+        self.ten_env.log_info("TranscribeASR connection stopped")
+
+    async def send_audio(self, frame: AudioFrame, session_id: str | None) -> None:
+        self.session_id = session_id or self.session_id
+        frame_buf = frame.get_buf()
+        if self.event_handler:
+            self.event_handler.session_id = self.session_id
+        if frame_buf:
+            await self.stream.input_stream.send_audio_event(audio_chunk=frame_buf)
 
     def is_connected(self) -> bool:
-        return self.transcribe.is_connected()
-
-    async def send_audio(self, frame: AudioFrame, session_id: str | None) -> bool:
-        pass
+        return self.stream is not None
 
     async def finalize(self, session_id: str | None) -> None:
-        raise NotImplementedError(
-            "Transcribe ASR does not support finalize operation yet."
-        )
+        raise NotImplementedError("Finalize method is not implemented in TranscribeASRExtension")
+
+    def input_audio_sample_rate(self) -> int:
+        return self.config.sample_rate
+
+    async def _handle_reconnect(self):
+        await asyncio.sleep(0.2)
+        self.ten_env.log_info("Attempting reconnect...")
+        await self.start_connection()
+
+
+class TranscribeEventHandler(TranscriptResultStreamHandler):
+    def __init__(
+        self,
+        transcript_result_stream: TranscriptResultStream,
+        ten_env: AsyncTenEnv,
+        session_id: str,
+        lang_code: str = "en-US",
+    ):
+        super().__init__(transcript_result_stream)
+        self.ten_env = ten_env
+        self.session_id: str = session_id
+        self.lang_code:str = lang_code
+
+    async def handle_transcript_event(self, transcript_event: TranscriptEvent) -> None:
+        try:
+            text_result = ""
+            is_final = True
+
+            for result in transcript_event.transcript.results:
+                if result.is_partial:
+                    is_final = False
+                for alt in result.alternatives:
+                    text_result += alt.transcript
+
+            if not text_result:
+                return
+
+            self.ten_env.log_info(f"got transcript: [{text_result}], is_final: [{is_final}]")
+
+            transcription = UserTranscription(
+                text=text_result,
+                final=is_final,
+                start_ms=0,
+                duration_ms=0,
+                language=self.lang_code,
+                metadata={"session_id": self.session_id},
+            )
+            await self.ten_env.send_data(transcription)
+        except Exception as e:
+            self.ten_env.log_error(f"handle_transcript_event error: {e}")
