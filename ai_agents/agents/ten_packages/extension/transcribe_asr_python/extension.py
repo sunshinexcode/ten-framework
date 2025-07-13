@@ -35,7 +35,9 @@ class TranscribeASRExtension(AsyncASRBaseExtension):
         super().__init__(name)
         self.config: TranscribeASRConfig = None
         self.client: amazon_transcribe.client.TranscribeStreamingClient = None
-        self.stream: amazon_transcribe.model.StartStreamTranscriptionEventStream = None
+        self.stream: (
+            amazon_transcribe.model.StartStreamTranscriptionEventStream
+        ) = None
         self.handler_task: asyncio.Task = None
         self.event_handler = None
 
@@ -63,7 +65,11 @@ class TranscribeASRExtension(AsyncASRBaseExtension):
                     ),
                 )
             else:
-                self.client = amazon_transcribe.client.TranscribeStreamingClient(region=self.config.region)
+                self.client = (
+                    amazon_transcribe.client.TranscribeStreamingClient(
+                        region=self.config.region
+                    )
+                )
 
             self.stream = await self.client.start_stream_transcription(
                 language_code=self.config.lang_code,
@@ -71,17 +77,20 @@ class TranscribeASRExtension(AsyncASRBaseExtension):
                 media_encoding=self.config.media_encoding,
             )
 
-
             self.event_handler = TranscribeEventHandler(
-                self.stream.output_stream, self.ten_env, self.session_id, self.config.lang_code
+                self.stream.output_stream, self.ten_env
             )
             self.event_handler.on_transcript_event_cb = self.on_transcript_event
-            self.handler_task = asyncio.create_task(self.event_handler.handle_events())
+            self.handler_task = asyncio.create_task(
+                self.event_handler.handle_events()
+            )
 
             self.ten_env.log_info("Transcribe stream started")
 
         except Exception as e:
-            self.ten_env.log_error(f"start_connection error: {traceback.format_exc()}")
+            self.ten_env.log_error(
+                f"start_connection error: {traceback.format_exc()}"
+            )
             await self.send_asr_error(
                 ErrorMessage(
                     code=1,
@@ -101,17 +110,23 @@ class TranscribeASRExtension(AsyncASRBaseExtension):
             self.handler_task = None
         self.ten_env.log_info("TranscribeASR connection stopped")
 
-    async def send_audio(self, frame: AudioFrame, session_id: str | None) -> None:
+    async def send_audio(
+        self, frame: AudioFrame, session_id: str | None
+    ) -> None:
         self.session_id = session_id or self.session_id
         frame_buf = frame.get_buf()
         if frame_buf:
-            await self.stream.input_stream.send_audio_event(audio_chunk=frame_buf)
+            await self.stream.input_stream.send_audio_event(
+                audio_chunk=frame_buf
+            )
 
     def is_connected(self) -> bool:
         return self.stream is not None
 
     async def finalize(self, session_id: str | None) -> None:
-        raise NotImplementedError("Finalize method is not implemented in TranscribeASRExtension")
+        raise NotImplementedError(
+            "Finalize method is not implemented in TranscribeASRExtension"
+        )
 
     def input_audio_sample_rate(self) -> int:
         return self.config.sample_rate
@@ -121,7 +136,9 @@ class TranscribeASRExtension(AsyncASRBaseExtension):
         self.ten_env.log_info("Attempting reconnect...")
         await self.start_connection()
 
-    async def on_transcript_event(self, transcript_event: amazon_transcribe.model.TranscriptEvent) -> None:
+    async def on_transcript_event(
+        self, transcript_event: amazon_transcribe.model.TranscriptEvent
+    ) -> None:
         try:
             text_result = ""
             is_final = True
@@ -135,7 +152,9 @@ class TranscribeASRExtension(AsyncASRBaseExtension):
             if not text_result:
                 return
 
-            self.ten_env.log_info(f"got transcript: [{text_result}], is_final: [{is_final}]")
+            self.ten_env.log_info(
+                f"got transcript: [{text_result}], is_final: [{is_final}]"
+            )
 
             transcription = UserTranscription(
                 text=text_result,
@@ -149,7 +168,10 @@ class TranscribeASRExtension(AsyncASRBaseExtension):
         except Exception as e:
             self.ten_env.log_error(f"handle_transcript_event error: {e}")
 
-class TranscribeEventHandler(amazon_transcribe.handlers.TranscriptResultStreamHandler):
+
+class TranscribeEventHandler(
+    amazon_transcribe.handlers.TranscriptResultStreamHandler
+):
     def __init__(
         self,
         transcript_result_stream: amazon_transcribe.model.TranscriptResultStream,
@@ -158,10 +180,13 @@ class TranscribeEventHandler(amazon_transcribe.handlers.TranscriptResultStreamHa
         super().__init__(transcript_result_stream)
         self.ten_env = ten_env
         self.on_transcript_event_cb: (
-            Callable[[amazon_transcribe.model.TranscriptEvent], Awaitable[None]] | None
+            Callable[[amazon_transcribe.model.TranscriptEvent], Awaitable[None]]
+            | None
         ) = None
 
-    async def handle_transcript_event(self, transcript_event: amazon_transcribe.model.TranscriptEvent) -> None:
+    async def handle_transcript_event(
+        self, transcript_event: amazon_transcribe.model.TranscriptEvent
+    ) -> None:
         if self.on_transcript_event_cb:
             await self.on_transcript_event_cb(transcript_event)
         else:

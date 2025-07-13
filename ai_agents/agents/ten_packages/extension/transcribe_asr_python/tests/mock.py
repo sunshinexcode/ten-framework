@@ -9,10 +9,14 @@ from types import SimpleNamespace
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
+
 @pytest.fixture(scope="function")
 def patch_transcribe():
-    with patch("ten_packages.extension.transcribe_asr_python.extension.amazon_transcribe.client.TranscribeStreamingClient") as MockClient, \
-         patch("ten_packages.extension.transcribe_asr_python.extension.TranscribeEventHandler") as MockHandler:
+    with patch(
+        "ten_packages.extension.transcribe_asr_python.extension.amazon_transcribe.client.TranscribeStreamingClient"
+    ) as MockClient, patch(
+        "ten_packages.extension.transcribe_asr_python.extension.TranscribeEventHandler"
+    ) as MockHandler:
 
         # Create mock client as AsyncMock to support await
         mock_client_instance = AsyncMock()
@@ -22,7 +26,6 @@ def patch_transcribe():
         event_stream_mock = AsyncMock()
         output_stream_mock = MagicMock()
         handler_instance = AsyncMock()
-
 
         # Setup input stream with async methods
         fake_input_stream = MagicMock()
@@ -46,7 +49,9 @@ def patch_transcribe():
                     results=[
                         SimpleNamespace(
                             is_partial=False,
-                            alternatives=[SimpleNamespace(transcript="hello world")]
+                            alternatives=[
+                                SimpleNamespace(transcript="hello world")
+                            ],
                         )
                     ]
                 )
@@ -60,7 +65,9 @@ def patch_transcribe():
             asyncio.create_task(handle_transcript_event(None))
             return event_stream_mock
 
-        mock_client_instance.start_stream_transcription.side_effect = start_stream_side_effect
+        mock_client_instance.start_stream_transcription.side_effect = (
+            start_stream_side_effect
+        )
         MockHandler.return_value = handler_instance
 
         yield SimpleNamespace(
@@ -68,5 +75,5 @@ def patch_transcribe():
             stream=event_stream_mock,
             input_stream=fake_input_stream,
             output_stream=output_stream_mock,
-            handler=handler_instance
+            handler=handler_instance,
         )

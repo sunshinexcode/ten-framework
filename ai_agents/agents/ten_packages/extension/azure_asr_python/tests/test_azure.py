@@ -108,27 +108,34 @@ def test_azure(patch_azure_ws):
     def fake_start_continuous_recognition_async_get():
 
         def triggerRecognized():
-            evt = SimpleNamespace(result=SimpleNamespace(
-                json=json.dumps({
-                    "DisplayText": "hello world",
-                    "Offset": 0,
-                    "Duration": 5000000
-                })
-            ))
+            evt = SimpleNamespace(
+                result=SimpleNamespace(
+                    json=json.dumps(
+                        {
+                            "DisplayText": "hello world",
+                            "Offset": 0,
+                            "Duration": 5000000,
+                        }
+                    )
+                )
+            )
             patch_azure_ws.event_handlers["recognized"](evt)
 
         threading.Timer(1.0, triggerRecognized).start()
         return None
 
-
     start_future = MagicMock()
     start_future.get.side_effect = fake_start_continuous_recognition_async_get
 
     # Inject into recognizer
-    patch_azure_ws.recognizer_instance.start_continuous_recognition_async.return_value = start_future
+    patch_azure_ws.recognizer_instance.start_continuous_recognition_async.return_value = (
+        start_future
+    )
     stop_future = MagicMock()
     stop_future.get.return_value = None
-    patch_azure_ws.recognizer_instance.stop_continuous_recognition_async.return_value = stop_future
+    patch_azure_ws.recognizer_instance.stop_continuous_recognition_async.return_value = (
+        stop_future
+    )
 
     tester = ExtensionTesterAzure()
     tester.set_test_mode_single(
@@ -139,9 +146,7 @@ def test_azure(patch_azure_ws):
                 "language": "en-US",
                 "model": "nova-2",
                 "sample_rate": 16000,
-                "params": {
-                    "test": "123"
-                }
+                "params": {"test": "123"},
             }
         ),
     )
@@ -150,32 +155,38 @@ def test_azure(patch_azure_ws):
     assert error is None
 
 
-
 def test_azure_unexpected_result(patch_azure_ws):
     def fake_start_continuous_recognition_async_get():
 
         def triggerRecognized():
-            evt = SimpleNamespace(result=SimpleNamespace(
-                json=json.dumps({
-                    "DisplayText": "goodbye world",
-                    "Offset": 0,
-                    "Duration": 5000000
-                })
-            ))
+            evt = SimpleNamespace(
+                result=SimpleNamespace(
+                    json=json.dumps(
+                        {
+                            "DisplayText": "goodbye world",
+                            "Offset": 0,
+                            "Duration": 5000000,
+                        }
+                    )
+                )
+            )
             patch_azure_ws.event_handlers["recognized"](evt)
 
         threading.Timer(1.0, triggerRecognized).start()
         return None
 
-
     start_future = MagicMock()
     start_future.get.side_effect = fake_start_continuous_recognition_async_get
 
     # Inject into recognizer
-    patch_azure_ws.recognizer_instance.start_continuous_recognition_async.return_value = start_future
+    patch_azure_ws.recognizer_instance.start_continuous_recognition_async.return_value = (
+        start_future
+    )
     stop_future = MagicMock()
     stop_future.get.return_value = None
-    patch_azure_ws.recognizer_instance.stop_continuous_recognition_async.return_value = stop_future
+    patch_azure_ws.recognizer_instance.stop_continuous_recognition_async.return_value = (
+        stop_future
+    )
 
     tester = ExtensionTesterAzure()
     tester.set_test_mode_single(

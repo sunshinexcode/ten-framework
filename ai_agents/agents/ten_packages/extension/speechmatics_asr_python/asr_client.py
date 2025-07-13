@@ -6,12 +6,12 @@
 
 import asyncio
 import os
-from typing import List,TYPE_CHECKING
+from typing import List, TYPE_CHECKING
 import speechmatics.models
 import speechmatics.client
 from ten_ai_base.message import ErrorMessage, ModuleType
 from ten_ai_base.transcription import UserTranscription, Word
-from ten_runtime import AsyncTenEnv, AudioFrame, Data
+from ten_runtime import AsyncTenEnv, AudioFrame
 from .audio_stream import AudioStream, AudioStreamEventType
 from .config import SpeechmaticsASRConfig
 from .word import (
@@ -23,6 +23,7 @@ from .word import (
 from .timeline import AudioTimeline
 from .language_utils import get_speechmatics_language
 from .dumper import Dumper
+
 if TYPE_CHECKING:
     from .extension import SpeechmaticsASRExtension  # Only for type hints
 
@@ -36,7 +37,12 @@ async def run_asr_client(client: "SpeechmaticsASRClient"):
 
 
 class SpeechmaticsASRClient:
-    def __init__(self, extension: "SpeechmaticsASRExtension", config: SpeechmaticsASRConfig, ten_env: AsyncTenEnv):
+    def __init__(
+        self,
+        extension: "SpeechmaticsASRExtension",
+        config: SpeechmaticsASRConfig,
+        ten_env: AsyncTenEnv,
+    ):
         self.config = config
         self.ten_env = ten_env
         self.task = None
@@ -62,7 +68,9 @@ class SpeechmaticsASRClient:
             self.audio_dumper = Dumper(dump_file_path)
 
         self.audio_settings: speechmatics.models.AudioSettings | None = None
-        self.transcription_config: speechmatics.models.TranscriptionConfig | None = None
+        self.transcription_config: (
+            speechmatics.models.TranscriptionConfig | None
+        ) = None
         self.client: speechmatics.client.WebsocketClient | None = None
 
     async def start(self) -> None:
@@ -111,16 +119,20 @@ class SpeechmaticsASRClient:
             self._handle_recognition_started,
         )
         self.client.add_event_handler(
-            speechmatics.models.ServerMessageType.EndOfTranscript, self._handle_end_transcript
+            speechmatics.models.ServerMessageType.EndOfTranscript,
+            self._handle_end_transcript,
         )
         self.client.add_event_handler(
             speechmatics.models.ServerMessageType.AudioEventStarted,
             self._handle_audio_event_started,
         )
         self.client.add_event_handler(
-            speechmatics.models.ServerMessageType.AudioEventEnded, self._handle_audio_event_ended
+            speechmatics.models.ServerMessageType.AudioEventEnded,
+            self._handle_audio_event_ended,
         )
-        self.client.add_event_handler(speechmatics.models.ServerMessageType.Info, self._handle_info)
+        self.client.add_event_handler(
+            speechmatics.models.ServerMessageType.Info, self._handle_info
+        )
         self.client.add_event_handler(
             speechmatics.models.ServerMessageType.Warning, self._handle_warning
         )
@@ -150,7 +162,9 @@ class SpeechmaticsASRClient:
         if self.config.dump:
             await self.audio_dumper.start()
 
-    async def recv_audio_frame(self, frame: AudioFrame, session_id: str) -> None:
+    async def recv_audio_frame(
+        self, frame: AudioFrame, session_id: str
+    ) -> None:
         frame_buf = frame.get_buf()
         if not frame_buf:
             self.ten_env.log_warn("send_frame: empty audio_frame detected.")
@@ -269,10 +283,12 @@ class SpeechmaticsASRClient:
                 words=[],
                 metadata={
                     "session_id": self.session_id,
-                }
+                },
             )
 
-            asyncio.create_task(self.extension.send_asr_transcription(transcription))
+            asyncio.create_task(
+                self.extension.send_asr_transcription(transcription)
+            )
         except Exception as e:
             self.ten_env.log_error(f"Error processing transcript: {e}")
             error_message = ErrorMessage(
@@ -281,7 +297,9 @@ class SpeechmaticsASRClient:
                 turn_id=0,
                 module=ModuleType.STT,
             )
-            asyncio.create_task(self.extension.send_asr_error(error_message, vendor_info=None))
+            asyncio.create_task(
+                self.extension.send_asr_error(error_message, vendor_info=None)
+            )
 
     def _handle_transcript_word_final_mode(self, msg):
         try:
@@ -305,10 +323,12 @@ class SpeechmaticsASRClient:
                     words=[],
                     metadata={
                         "session_id": self.session_id,
-                    }
+                    },
                 )
 
-                asyncio.create_task(self.extension.send_asr_transcription(transcription))
+                asyncio.create_task(
+                    self.extension.send_asr_transcription(transcription)
+                )
         except Exception as e:
             self.ten_env.log_error(f"Error processing transcript: {e}")
             error_message = ErrorMessage(
@@ -317,7 +337,9 @@ class SpeechmaticsASRClient:
                 turn_id=0,
                 module=ModuleType.STT,
             )
-            asyncio.create_task(self.extension.send_asr_error(error_message, vendor_info=None))
+            asyncio.create_task(
+                self.extension.send_asr_error(error_message, vendor_info=None)
+            )
 
     def _handle_transcript_sentence_final_mode(self, msg):
         self.ten_env.log_info(
@@ -369,11 +391,13 @@ class SpeechmaticsASRClient:
                         words=self.get_words(self.cache_words),
                         metadata={
                             "session_id": self.session_id,
-                        }
+                        },
                     )
 
                     asyncio.create_task(
-                        self.extension.send_asr_transcription(user_transcription)
+                        self.extension.send_asr_transcription(
+                            user_transcription
+                        )
                     )
                     self.cache_words = []
 
@@ -385,8 +409,6 @@ class SpeechmaticsASRClient:
                 start_ms = get_sentence_start_ms(self.cache_words)
                 duration_ms = get_sentence_duration_ms(self.cache_words)
 
-
-
                 user_transcription = UserTranscription(
                     text=sentence,
                     final=False,
@@ -396,7 +418,7 @@ class SpeechmaticsASRClient:
                     words=self.get_words(self.cache_words),
                     metadata={
                         "session_id": self.session_id,
-                    }
+                    },
                 )
 
                 asyncio.create_task(
@@ -410,7 +432,9 @@ class SpeechmaticsASRClient:
                 turn_id=0,
                 module=ModuleType.STT,
             )
-            asyncio.create_task(self.extension.send_asr_error(error_message, vendor_info=None))
+            asyncio.create_task(
+                self.extension.send_asr_error(error_message, vendor_info=None)
+            )
 
     def _handle_end_transcript(self, msg):
         self.ten_env.log_info(f"_handle_end_transcript, msg: {msg}")
@@ -429,11 +453,16 @@ class SpeechmaticsASRClient:
             turn_id=0,
             module=ModuleType.STT,
         )
-        asyncio.create_task(self.extension.send_asr_error(error_message, vendor_info={
-            "vendor": "speechmatics",
-            "code": error.code if hasattr(error, 'code') else -1,
-            "message": str(error),
-        }))
+        asyncio.create_task(
+            self.extension.send_asr_error(
+                error_message,
+                vendor_info={
+                    "vendor": "speechmatics",
+                    "code": error.code if hasattr(error, "code") else -1,
+                    "message": str(error),
+                },
+            )
+        )
 
     def _handle_audio_event_started(self, msg):
         self.ten_env.log_info(f"_handle_audio_event_started, msg: {msg}")
@@ -441,14 +470,13 @@ class SpeechmaticsASRClient:
     def _handle_audio_event_ended(self, msg):
         self.ten_env.log_info(f"_handle_audio_event_ended, msg: {msg}")
 
-
     def get_words(self, words: List[SpeechmaticsASRWord]) -> List[Word]:
         """
         Get the cached words for sentence final mode.
         """
-        words = []
+        new_words = []
         for w in words:
-            words.append(
+            new_words.append(
                 {
                     "word": w.word,
                     "start_ms": w.start_ms,
@@ -456,4 +484,4 @@ class SpeechmaticsASRClient:
                     "stable": True,
                 }
             )
-        return words
+        return new_words

@@ -28,10 +28,7 @@ class AzureASRConfig(BaseModel):
     sample_rate: int = 16000
     azure_log_path: str = "azure.log"
     params: Dict[str, Any] = field(default_factory=dict)
-    black_list_params: List[str] = field(
-        default_factory=lambda: [
-        ]
-    )
+    black_list_params: List[str] = field(default_factory=lambda: [])
 
     def is_black_list_params(self, key: str) -> bool:
         return key in self.black_list_params
@@ -61,7 +58,6 @@ class AzureASRExtension(AsyncASRBaseExtension):
     async def _handle_reconnect(self):
         await asyncio.sleep(0.2)
         await self.start_connection()
-
 
     async def _on_message(self, _, result):
         try:
@@ -104,27 +100,36 @@ class AzureASRExtension(AsyncASRBaseExtension):
                 ),
                 None,
             )
-    async def _on_recognizing(self, evt:speechsdk.SpeechRecognitionEventArgs):
+
+    async def _on_recognizing(self, evt: speechsdk.SpeechRecognitionEventArgs):
         """Handle the recognizing event from Azure ASR."""
         result = json.loads(evt.result.json)
         self.ten_env.log_debug(f"azure event callback on_recognizing: {result}")
         text = result.get("Text", "")
-        start_ms = result.get("Offset", 0) // 10000  # Convert ticks to milliseconds
+        start_ms = (
+            result.get("Offset", 0) // 10000
+        )  # Convert ticks to milliseconds
         duration_ms = result.get("Duration", 0) // 10000  # Convert
-        await self._on_recognized_result(text, final=False, start_ms=start_ms, duration_ms=duration_ms)
+        await self._on_recognized_result(
+            text, final=False, start_ms=start_ms, duration_ms=duration_ms
+        )
 
-
-    async def _on_recognized(self, evt:speechsdk.SpeechRecognitionEventArgs):
+    async def _on_recognized(self, evt: speechsdk.SpeechRecognitionEventArgs):
         """Handle the recognized event from Azure ASR."""
         result = json.loads(evt.result.json)
         self.ten_env.log_debug(f"azure event callback on_recognizing: {result}")
         text = result.get("DisplayText", "")
-        start_ms = result.get("Offset", 0) // 10000  # Convert ticks to milliseconds
+        start_ms = (
+            result.get("Offset", 0) // 10000
+        )  # Convert ticks to milliseconds
         duration_ms = result.get("Duration", 0) // 10000  # Convert
-        await self._on_recognized_result(text, final=True, start_ms=start_ms, duration_ms=duration_ms)
+        await self._on_recognized_result(
+            text, final=True, start_ms=start_ms, duration_ms=duration_ms
+        )
 
-
-    async def _on_recognized_result(self, text:str, final: bool, start_ms: int = 0, duration_ms: int = 0):
+    async def _on_recognized_result(
+        self, text: str, final: bool, start_ms: int = 0, duration_ms: int = 0
+    ):
         """Handle the recognized result from Azure ASR."""
         try:
             transcription = UserTranscription(
@@ -136,7 +141,7 @@ class AzureASRExtension(AsyncASRBaseExtension):
                 words=[],
                 metadata={
                     "session_id": self.session_id,
-                }
+                },
             )
             await self.send_asr_transcription(transcription)
         except Exception as e:
@@ -153,12 +158,16 @@ class AzureASRExtension(AsyncASRBaseExtension):
 
     async def _on_session_started(self, evt):
         """Handle the session started event from Azure ASR."""
-        self.ten_env.log_debug(f"azure event callback on_session_started: {evt}")
+        self.ten_env.log_debug(
+            f"azure event callback on_session_started: {evt}"
+        )
         self.connected = True
 
     async def _on_session_stopped(self, evt):
         """Handle the session stopped event from Azure ASR."""
-        self.ten_env.log_debug(f"azure event callback on_session_stopped: {evt}")
+        self.ten_env.log_debug(
+            f"azure event callback on_session_stopped: {evt}"
+        )
         self.connected = False
         if not self.stopped:
             self.ten_env.log_warn(
@@ -171,7 +180,9 @@ class AzureASRExtension(AsyncASRBaseExtension):
         self.ten_env.log_error(f"azure event callback on_canceled: {evt}")
 
         details = speechsdk.CancellationDetails(evt.result)
-        self.ten_env.log_error(f"[azure] CANCELED: reason={details.reason}, error_code={details.code}, details={details.error_details}")
+        self.ten_env.log_error(
+            f"[azure] CANCELED: reason={details.reason}, error_code={details.code}, details={details.error_details}"
+        )
 
         await self.send_asr_error(
             ErrorMessage(
@@ -187,7 +198,6 @@ class AzureASRExtension(AsyncASRBaseExtension):
             ),
         )
 
-
     async def start_connection(self) -> None:
         self.ten_env.log_info("start and listen azure")
         try:
@@ -198,7 +208,9 @@ class AzureASRExtension(AsyncASRBaseExtension):
                 self.ten_env.log_info(f"config: {self.config}")
 
                 if not self.config.api_key or not self.config.region:
-                    self.ten_env.log_error("get property api_key or region failed")
+                    self.ten_env.log_error(
+                        "get property api_key or region failed"
+                    )
                     return
 
             await self.stop_connection()
@@ -207,10 +219,12 @@ class AzureASRExtension(AsyncASRBaseExtension):
                 channels=self.input_audio_channels(),
                 samples_per_second=self.input_audio_sample_rate(),
                 bits_per_sample=self.input_audio_sample_width() * 8,
-                wave_stream_format=speechsdk.AudioStreamWaveFormat.PCM
+                wave_stream_format=speechsdk.AudioStreamWaveFormat.PCM,
             )
 
-            self.stream = speechsdk.audio.PushAudioInputStream(stream_format=stream_format)
+            self.stream = speechsdk.audio.PushAudioInputStream(
+                stream_format=stream_format
+            )
             audio_config = speechsdk.audio.AudioConfig(stream=self.stream)
 
             speech_config = speechsdk.SpeechConfig(
@@ -219,15 +233,19 @@ class AzureASRExtension(AsyncASRBaseExtension):
             )
 
             if self.config.azure_log_path:
-                speech_config.set_property(speechsdk.PropertyId.Speech_LogFilename, self.config.azure_log_path)
-
+                speech_config.set_property(
+                    speechsdk.PropertyId.Speech_LogFilename,
+                    self.config.azure_log_path,
+                )
 
             # Update options with params
             if self.config.params:
                 for key, value in self.config.params.items():
                     # Check if it's a valid option and not in black list
                     if not self.config.is_black_list_params(key):
-                        self.ten_env.log_debug(f"set azure param: {key} = {value}")
+                        self.ten_env.log_debug(
+                            f"set azure param: {key} = {value}"
+                        )
                         speech_config.set_property(key, value)
 
             # Set the Speech_SegmentationSilenceTimeoutMs parameter to 3500ms
@@ -238,22 +256,41 @@ class AzureASRExtension(AsyncASRBaseExtension):
                 audio_config=audio_config,
             )
 
-
-
             loop = asyncio.get_running_loop()
 
-            self.client.recognizing.connect(lambda evt: loop.call_soon_threadsafe(asyncio.create_task, self._on_recognizing(evt)))
-            self.client.recognized.connect(lambda evt: loop.call_soon_threadsafe(asyncio.create_task, self._on_recognized(evt)))
-            self.client.session_started.connect(lambda evt: loop.call_soon_threadsafe(asyncio.create_task, self._on_session_started(evt)))
-            self.client.session_stopped.connect(lambda evt: loop.call_soon_threadsafe(asyncio.create_task, self._on_session_stopped(evt)))
-            self.client.canceled.connect(lambda evt: loop.call_soon_threadsafe(asyncio.create_task, self._on_canceled(evt)))
-
+            self.client.recognizing.connect(
+                lambda evt: loop.call_soon_threadsafe(
+                    asyncio.create_task, self._on_recognizing(evt)
+                )
+            )
+            self.client.recognized.connect(
+                lambda evt: loop.call_soon_threadsafe(
+                    asyncio.create_task, self._on_recognized(evt)
+                )
+            )
+            self.client.session_started.connect(
+                lambda evt: loop.call_soon_threadsafe(
+                    asyncio.create_task, self._on_session_started(evt)
+                )
+            )
+            self.client.session_stopped.connect(
+                lambda evt: loop.call_soon_threadsafe(
+                    asyncio.create_task, self._on_session_stopped(evt)
+                )
+            )
+            self.client.canceled.connect(
+                lambda evt: loop.call_soon_threadsafe(
+                    asyncio.create_task, self._on_canceled(evt)
+                )
+            )
 
             result_future = self.client.start_continuous_recognition_async()
             await loop.run_in_executor(None, result_future.get)
             self.ten_env.log_info("start_connection completed")
         except Exception as e:
-            self.ten_env.log_error(f"Error starting azure connection: {traceback.format_exc()}")
+            self.ten_env.log_error(
+                f"Error starting azure connection: {traceback.format_exc()}"
+            )
             await self.send_asr_error(
                 ErrorMessage(
                     code=1,
@@ -295,9 +332,7 @@ class AzureASRExtension(AsyncASRBaseExtension):
         # TODO
         # await self.client.finalize()
 
-        raise NotImplementedError(
-            "Azure ASR has no finalize method yet."
-        )
+        raise NotImplementedError("Azure ASR has no finalize method yet.")
 
     async def _finalize_counter_if_needed(self, is_final: bool) -> None:
         if is_final and self.last_finalize_timestamp != 0:

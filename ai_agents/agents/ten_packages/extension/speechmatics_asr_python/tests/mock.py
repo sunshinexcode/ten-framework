@@ -8,6 +8,7 @@ from types import SimpleNamespace
 import pytest
 from unittest.mock import MagicMock, patch
 
+
 @pytest.fixture(scope="function")
 def patch_speechmatics_ws():
     patch_target = "ten_packages.extension.speechmatics_asr_python.asr_client.speechmatics.client"
@@ -25,10 +26,9 @@ def patch_speechmatics_ws():
 
         MockClient.return_value = recognizer_instance
 
-
         fixture_obj = SimpleNamespace(
             recognizer_instance=recognizer_instance,
-            event_handlers=event_handlers
+            event_handlers=event_handlers,
         )
 
         yield fixture_obj

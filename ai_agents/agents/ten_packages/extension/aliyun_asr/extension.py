@@ -102,9 +102,7 @@ class AliyunASRExtension(AsyncASRBaseExtension):
             )
 
             self.loop.create_task(
-                self.send_asr_transcription(
-                    transcription=transcription
-                )
+                self.send_asr_transcription(transcription=transcription)
             )
         except Exception as e:
             self.ten_env.log_error(f"Error processing message: {e}")

@@ -44,10 +44,7 @@ class SpeechmaticsASRConfig(BaseModel):
         return f"{config}"
 
     params: Dict[str, Any] = field(default_factory=dict)
-    black_list_params: List[str] = field(
-        default_factory=lambda: [
-        ]
-    )
+    black_list_params: List[str] = field(default_factory=lambda: [])
 
     def is_black_list_params(self, key: str) -> bool:
         return key in self.black_list_params

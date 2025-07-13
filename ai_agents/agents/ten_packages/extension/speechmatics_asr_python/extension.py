@@ -34,7 +34,9 @@ class SpeechmaticsASRExtension(AsyncASRBaseExtension):
 
             if self.config is None:
                 config_json, _ = await self.ten_env.get_property_to_json("")
-                self.config = SpeechmaticsASRConfig.model_validate_json(config_json)
+                self.config = SpeechmaticsASRConfig.model_validate_json(
+                    config_json
+                )
                 self.ten_env.log_info(f"config: {self.config}")
 
                 if not self.config.key:
@@ -52,13 +54,14 @@ class SpeechmaticsASRExtension(AsyncASRBaseExtension):
             return await self.client._internal_drain_mute_pkg()
         return await self.client._internal_drain_disconnect()
 
-    async def send_audio(self, frame: AudioFrame, session_id: str | None) -> bool:
+    async def send_audio(
+        self, frame: AudioFrame, session_id: str | None
+    ) -> bool:
         await self.client.recv_audio_frame(frame, session_id)
         return True
 
     def is_connected(self) -> bool:
         return self.client.client.session_running
-
 
     def input_audio_sample_rate(self) -> int:
         return self.config.sample_rate

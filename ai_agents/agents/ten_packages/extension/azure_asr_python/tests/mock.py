@@ -8,15 +8,20 @@ from types import SimpleNamespace
 import pytest
 from unittest.mock import MagicMock, patch
 
+
 @pytest.fixture(scope="function")
 def patch_azure_ws():
     patch_target = "ten_packages.extension.azure_asr_python.extension.speechsdk.SpeechRecognizer"
 
-    with patch(patch_target) as MockRecognizer, \
-        patch("ten_packages.extension.azure_asr_python.extension.speechsdk.SpeechConfig") as MockSpeechConfig, \
-        patch("ten_packages.extension.azure_asr_python.extension.speechsdk.audio.AudioConfig") as MockAudioConfig, \
-        patch("ten_packages.extension.azure_asr_python.extension.speechsdk.audio.PushAudioInputStream") as MockStream, \
-        patch("ten_packages.extension.azure_asr_python.extension.speechsdk.audio.AudioStreamFormat") as MockStreamFormat:
+    with patch(patch_target) as MockRecognizer, patch(
+        "ten_packages.extension.azure_asr_python.extension.speechsdk.SpeechConfig"
+    ) as MockSpeechConfig, patch(
+        "ten_packages.extension.azure_asr_python.extension.speechsdk.audio.AudioConfig"
+    ) as MockAudioConfig, patch(
+        "ten_packages.extension.azure_asr_python.extension.speechsdk.audio.PushAudioInputStream"
+    ) as MockStream, patch(
+        "ten_packages.extension.azure_asr_python.extension.speechsdk.audio.AudioStreamFormat"
+    ) as MockStreamFormat:
 
         recognizer_instance = MagicMock()
         event_handlers = {}
@@ -33,10 +38,9 @@ def patch_azure_ws():
         MockStream.return_value = MagicMock()
         MockStreamFormat.return_value = MagicMock()
 
-
         fixture_obj = SimpleNamespace(
             recognizer_instance=recognizer_instance,
-            event_handlers=event_handlers
+            event_handlers=event_handlers,
         )
 
         yield fixture_obj

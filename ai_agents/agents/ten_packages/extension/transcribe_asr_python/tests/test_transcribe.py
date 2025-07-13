@@ -60,7 +60,7 @@ class ExtensionTesterTranscribe(AsyncExtensionTester):
                 ten_env.stop_test(
                     TenError.create(
                         TenErrorCode.ErrorCodeGeneric,
-                        f"unexpected text: {json_data.get('text')}"
+                        f"unexpected text: {json_data.get('text')}",
                     )
                 )
 
@@ -77,13 +77,15 @@ def test_transcribe_basic(patch_transcribe):
     tester = ExtensionTesterTranscribe()
     tester.set_test_mode_single(
         "transcribe_asr_python",
-        json.dumps({
-            "access_key": "abc",
-            "secret_key": "xyz",
-            "region": "us-east-1",
-            "sample_rate": 16000,
-            "lang_code": "en-US",
-        })
+        json.dumps(
+            {
+                "access_key": "abc",
+                "secret_key": "xyz",
+                "region": "us-east-1",
+                "sample_rate": 16000,
+                "lang_code": "en-US",
+            }
+        ),
     )
 
     error = tester.run()

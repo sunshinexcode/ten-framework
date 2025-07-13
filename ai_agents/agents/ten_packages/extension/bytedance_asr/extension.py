@@ -15,7 +15,6 @@ from .bytedance_asr import AsrWsClient
 from dataclasses import dataclass, field
 
 
-
 @dataclass
 class BytedanceASRConfig(BaseModel):
     # Refer to: https://www.volcengine.com/docs/6561/80818.
@@ -25,15 +24,10 @@ class BytedanceASRConfig(BaseModel):
     api_url: str = "wss://openspeech.bytedance.com/api/v2/asr"
     cluster: str = "volcengine_streaming_common"
     params: Dict[str, Any] = field(default_factory=dict)
-    black_list_params: List[str] = field(
-        default_factory=lambda: [
-        ]
-    )
+    black_list_params: List[str] = field(default_factory=lambda: [])
 
     def is_black_list_params(self, key: str) -> bool:
         return key in self.black_list_params
-
-
 
 
 class BytedanceASRExtension(AsyncASRBaseExtension):
@@ -51,7 +45,6 @@ class BytedanceASRExtension(AsyncASRBaseExtension):
         cmd_result = CmdResult.create(StatusCode.OK, cmd)
         cmd_result.set_property_string("detail", "success")
         await ten_env.return_result(cmd_result)
-
 
     async def _handle_reconnect(self):
         await asyncio.sleep(0.2)  # Adjust the sleep time as needed
@@ -139,7 +132,9 @@ class BytedanceASRExtension(AsyncASRBaseExtension):
             self.client = None
             self.connected = False
 
-    async def send_audio(self, frame: AudioFrame, session_id: str | None) -> bool:
+    async def send_audio(
+        self, frame: AudioFrame, session_id: str | None
+    ) -> bool:
         self.session_id = session_id
         if self.client:
             await self.client.send(frame.get_buf())
