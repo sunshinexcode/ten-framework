@@ -81,7 +81,6 @@ class SpeechmaticsASRExtension(AsyncASRBaseExtension):
         )
         await self.send_asr_transcription(user_transcription)
 
-
     async def _on_error(
         self,
         error: Exception,

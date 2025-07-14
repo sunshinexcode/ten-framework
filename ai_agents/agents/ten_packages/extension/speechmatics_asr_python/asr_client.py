@@ -70,8 +70,15 @@ class SpeechmaticsASRClient:
             speechmatics.models.TranscriptionConfig | None
         ) = None
         self.client: speechmatics.client.WebsocketClient | None = None
-        self.on_transcription: Optional[Callable[[UserTranscription], Awaitable[None]]] = None
-        self.on_error: Optional[Callable[[ErrorMessage, Optional[ErrorMessageVendorInfo]], Awaitable[None]]] = None
+        self.on_transcription: Optional[
+            Callable[[UserTranscription], Awaitable[None]]
+        ] = None
+        self.on_error: Optional[
+            Callable[
+                [ErrorMessage, Optional[ErrorMessageVendorInfo]],
+                Awaitable[None],
+            ]
+        ] = None
 
     async def start(self) -> None:
         """Initialize and start the recognition session"""
@@ -449,12 +456,16 @@ class SpeechmaticsASRClient:
             module=ModuleType.STT,
         )
 
-
-        asyncio.create_task(self._emit_error(error_message, {
-            "vendor": "speechmatics",
-            "code": error.code if hasattr(error, "code") else -1,
-            "message": str(error),
-        }))
+        asyncio.create_task(
+            self._emit_error(
+                error_message,
+                {
+                    "vendor": "speechmatics",
+                    "code": error.code if hasattr(error, "code") else -1,
+                    "message": str(error),
+                },
+            )
+        )
 
     def _handle_audio_event_started(self, msg):
         self.ten_env.log_info(f"_handle_audio_event_started, msg: {msg}")
@@ -479,11 +490,15 @@ class SpeechmaticsASRClient:
         return new_words
 
     async def _emit_error(
-        self, error_message: ErrorMessage, vendor_info: Optional[ErrorMessageVendorInfo] = None
+        self,
+        error_message: ErrorMessage,
+        vendor_info: Optional[ErrorMessageVendorInfo] = None,
     ):
         """
         Emit an error message to the extension.
         """
         self.ten_env.log_error(f"Error: {error_message.message}")
         if callable(self.on_error):
-            await self.on_error(error_message, vendor_info) # pylint: disable=not-callable
+            await self.on_error(
+                error_message, vendor_info
+            )  # pylint: disable=not-callable
