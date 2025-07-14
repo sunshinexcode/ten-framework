@@ -210,7 +210,7 @@
       },
       {
         "name": "Shisa",
-        "auto_start": true,
+        "auto_start": false,
         "nodes": [
           {
             "type": "extension",

@@ -123,7 +123,7 @@ export const GRAPH_OPTIONS: GraphOptionItem[] = [
     value: "without_ten_turn_detection_and_ten_vad",
   },
   {
-    label: "Shisa (contact TEN to enable)",
+    label: "Shisa (currently disabled)",
     value: "Shisa",
   },
 ]
