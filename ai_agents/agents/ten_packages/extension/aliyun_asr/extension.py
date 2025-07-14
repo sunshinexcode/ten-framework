@@ -17,7 +17,6 @@ import json
 
 from dataclasses import dataclass, field
 
-
 @dataclass
 class AliyunASRConfig(BaseModel):
     # Refer to: https://help.aliyun.com/zh/isi/developer-reference/sdk-for-python-2.
@@ -171,6 +170,7 @@ class AliyunASRExtension(AsyncASRBaseExtension):
             await self.stop_connection()
 
             import nls
+            import nls.token
 
             token = nls.token.getToken(self.config.akid, self.config.aksecret)
             self.client = nls.NlsSpeechTranscriber(
