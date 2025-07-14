@@ -24,32 +24,34 @@
   },
   "api": {
     "property": {
-      "url": {
-        "type": "string"
-      },
-      "headers": {
-        "type": "string"
-      },
-      "method": {
-        "type": "string"
-      },
-      "timeout": {
-        "type": "int32"
-      },
-      "send_final_only": {
-        "type": "bool"
-      },
-      "data_type": {
-        "type": "string"
-      },
-      "send_on_close": {
-        "type": "bool"
-      },
-      "send_on_start": {
-        "type": "bool"
-      },
-      "direct_forward": {
-        "type": "bool"
+      "properties": {
+        "url": {
+          "type": "string"
+        },
+        "headers": {
+          "type": "string"
+        },
+        "method": {
+          "type": "string"
+        },
+        "timeout": {
+          "type": "int32"
+        },
+        "send_final_only": {
+          "type": "bool"
+        },
+        "data_type": {
+          "type": "string"
+        },
+        "send_on_close": {
+          "type": "bool"
+        },
+        "send_on_start": {
+          "type": "bool"
+        },
+        "direct_forward": {
+          "type": "bool"
+        }
       }
     },
     "data_in": [
