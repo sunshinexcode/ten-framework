@@ -624,7 +624,7 @@
       },
       {
         "name": "with_ten_turn_detection_and_ten_vad",
-        "auto_start": false,
+        "auto_start": true,
         "nodes": [
           {
             "type": "extension",

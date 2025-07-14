@@ -56,10 +56,10 @@ export const LANGUAGE_OPTIONS: LanguageOptionItem[] = [
   //   label: "Korean",
   //   value: "ko-KR",
   // },
-  {
-    label: "日本語",
-    value: "ja-JP",
-  }
+  // {
+  //   label: "日本語",
+  //   value: "ja-JP",
+  // }
 ]
 export const GRAPH_OPTIONS: GraphOptionItem[] = [
   // {
@@ -111,20 +111,20 @@ export const GRAPH_OPTIONS: GraphOptionItem[] = [
   //   value: "va_nova_multimodal_aws",
   // },
   {
-    label: "Shisa",
-    value: "Shisa",
-  },
-  {
     label: "With VAD and Turn Detection",
     value: "with_ten_turn_detection_and_ten_vad",
   },
-  // {
-  //   label: "With TEN Turn Detection",
-  //   value: "with_ten_turn_detection",
-  // },
+  {
+    label: "With TEN Turn Detection",
+    value: "with_ten_turn_detection",
+  },
   {
     label: "Without TEN Turn Detection and TEN VAD",
     value: "without_ten_turn_detection_and_ten_vad",
+  },
+  {
+    label: "Shisa (contact TEN to enable)",
+    value: "Shisa",
   },
 ]
 
