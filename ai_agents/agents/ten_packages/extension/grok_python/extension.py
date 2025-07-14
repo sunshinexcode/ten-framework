@@ -108,9 +108,9 @@ class GrokExtension(AsyncLLMBaseExtension):
             await async_ten_env.send_cmd(Cmd.create(CMD_OUT_FLUSH))
             async_ten_env.log_info("on_cmd sent flush")
             status_code, detail = StatusCode.OK, "success"
-            cmd_result = CmdResult.create(status_code)
+            cmd_result = CmdResult.create(status_code, cmd)
             cmd_result.set_property_string("detail", detail)
-            await async_ten_env.return_result(cmd_result, cmd)
+            await async_ten_env.return_result(cmd_result)
         elif cmd_name == CMD_IN_ON_USER_JOINED:
             self.users_count += 1
             # Send greeting when first user joined
@@ -118,15 +118,15 @@ class GrokExtension(AsyncLLMBaseExtension):
                 self.send_text_output(async_ten_env, self.config.greeting, True)
 
             status_code, detail = StatusCode.OK, "success"
-            cmd_result = CmdResult.create(status_code)
+            cmd_result = CmdResult.create(status_code, cmd)
             cmd_result.set_property_string("detail", detail)
-            await async_ten_env.return_result(cmd_result, cmd)
+            await async_ten_env.return_result(cmd_result)
         elif cmd_name == CMD_IN_ON_USER_LEFT:
             self.users_count -= 1
             status_code, detail = StatusCode.OK, "success"
-            cmd_result = CmdResult.create(status_code)
+            cmd_result = CmdResult.create(status_code, cmd)
             cmd_result.set_property_string("detail", detail)
-            await async_ten_env.return_result(cmd_result, cmd)
+            await async_ten_env.return_result(cmd_result)
         else:
             await super().on_cmd(async_ten_env, cmd)
 
@@ -135,8 +135,8 @@ class GrokExtension(AsyncLLMBaseExtension):
         async_ten_env.log_debug("on_data name {}".format(data_name))
 
         # Get the necessary properties
-        is_final = get_property_bool(data, "is_final")
-        input_text = get_property_string(data, "text")
+        is_final, _ = data.get_property_bool("is_final")
+        input_text, _ = data.get_property_string("text")
 
         if not is_final:
             async_ten_env.log_debug("ignore non-final input")
@@ -252,9 +252,10 @@ class GrokExtension(AsyncLLMBaseExtension):
                         # Send the command and handle the result through the future
                         [result, _] = await async_ten_env.send_cmd(cmd)
                         if result.get_status_code() == StatusCode.OK:
-                            tool_result: LLMToolResult = json.loads(
-                                result.get_property_to_json(CMD_PROPERTY_RESULT)
+                            r, _ = result.get_property_to_json(
+                                CMD_PROPERTY_RESULT
                             )
+                            tool_result: LLMToolResult = json.loads(r)
 
                             async_ten_env.log_info(
                                 f"tool_result: {tool_result}"
