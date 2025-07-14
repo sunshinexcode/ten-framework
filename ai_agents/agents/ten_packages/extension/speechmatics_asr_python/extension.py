@@ -5,6 +5,7 @@
 #
 
 from ten_ai_base.asr import AsyncASRBaseExtension
+from .audio_stream import AudioStreamEventType
 from ten_runtime import (
     AsyncTenEnv,
     Cmd,
@@ -51,8 +52,8 @@ class SpeechmaticsASRExtension(AsyncASRBaseExtension):
 
     async def finalize(self, session_id: str | None) -> None:
         if self.config.drain_mode == "mute_pkg":
-            return await self.client._internal_drain_mute_pkg()
-        return await self.client._internal_drain_disconnect()
+            return await self.client.internal_drain_mute_pkg()
+        return await self.client.internal_drain_disconnect()
 
     async def send_audio(
         self, frame: AudioFrame, session_id: str | None

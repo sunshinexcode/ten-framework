@@ -243,12 +243,12 @@ class SpeechmaticsASRClient:
 
         self.ten_env.log_info("SpeechmaticsASRClient run end")
 
-    async def _internal_drain_mute_pkg(self):
+    async def internal_drain_mute_pkg(self):
         # we push some silence pkg to the queue
         # to trigger the final recognition result.
         await self.audio_stream.push_mute_pkg()
 
-    async def _internal_drain_disconnect(self):
+    async def internal_drain_disconnect(self):
         await self.audio_queue.put(AudioStreamEventType.FLUSH)
         await self.audio_queue.put(AudioStreamEventType.CLOSE)
 
