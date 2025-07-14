@@ -12,7 +12,7 @@ import traceback
 from typing import Iterable, Optional
 import uuid
 
-from ten.async_ten_env import AsyncTenEnv
+from ten_runtime.async_ten_env import AsyncTenEnv
 from ten_ai_base.const import (
     CMD_PROPERTY_RESULT,
     CMD_TOOL_CALL,
@@ -38,7 +38,7 @@ from ten_ai_base.llm import AsyncLLMBaseExtension
 
 from .helper import parse_sentences
 from .openai import GrokClient, grokConfig
-from ten import (
+from ten_runtime import (
     Cmd,
     StatusCode,
     CmdResult,

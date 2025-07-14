@@ -5,7 +5,6 @@
 #
 
 from ten_ai_base.asr import AsyncASRBaseExtension
-from .audio_stream import AudioStreamEventType
 from ten_runtime import (
     AsyncTenEnv,
     Cmd,
