@@ -4,31 +4,52 @@
 # See the LICENSE file for more information.
 #
 
-from types import SimpleNamespace
+import asyncio
 import pytest
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
+
+from ten_ai_base.transcription import UserTranscription
 
 
 @pytest.fixture(scope="function")
 def patch_speechmatics_ws():
-    patch_target = "ten_packages.extension.speechmatics_asr_python.asr_client.speechmatics.client"
+    with patch(
+        "ten_packages.extension.speechmatics_asr_python.extension.SpeechmaticsASRClient"
+    ) as MockClient:
+        mock_client = MagicMock()
 
-    with patch(patch_target) as MockClient:
+        # We mock only the client logic; transcription is now handled by event
+        def mock_constructor(config, ten_env):
+            mock_client.on_transcription = None  # Will be set by extension
+            return mock_client
 
-        recognizer_instance = MagicMock()
-        event_handlers = {}
-        patch_speechmatics_ws.event_handlers = event_handlers
+        MockClient.side_effect = mock_constructor
 
-        def connect_mock(handler):
-            event_handlers["recognized"] = handler
+        async def mock_start():
+            async def delayed_transcription():
+                await asyncio.sleep(1)
+                if mock_client.on_transcription:
+                    await mock_client.on_transcription(
+                        UserTranscription(
+                            text="hello world",
+                            final=True,
+                            start_ms=0,
+                            duration_ms=1000,
+                            language="en-US",
+                            words=[],
+                            metadata={"session_id": "test"},
+                        )
+                    )
 
-        recognizer_instance.recognized.connect.side_effect = connect_mock
+            asyncio.get_event_loop().create_task(delayed_transcription())
 
-        MockClient.return_value = recognizer_instance
+        from types import SimpleNamespace
 
-        fixture_obj = SimpleNamespace(
-            recognizer_instance=recognizer_instance,
-            event_handlers=event_handlers,
-        )
+        mock_client.start = AsyncMock(side_effect=mock_start)
+        mock_client.stop = AsyncMock()
+        mock_client.recv_audio_frame = AsyncMock()
+        mock_client.internal_drain_mute_pkg = AsyncMock()
+        mock_client.internal_drain_disconnect = AsyncMock()
+        mock_client.client = MagicMock(session_running=True)
 
-        yield fixture_obj
+        yield mock_client

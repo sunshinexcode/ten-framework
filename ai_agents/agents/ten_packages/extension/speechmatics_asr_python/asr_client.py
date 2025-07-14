@@ -6,10 +6,10 @@
 
 import asyncio
 import os
-from typing import List, TYPE_CHECKING
+from typing import Awaitable, Callable, List, TYPE_CHECKING, Optional
 import speechmatics.models
 import speechmatics.client
-from ten_ai_base.message import ErrorMessage, ModuleType
+from ten_ai_base.message import ErrorMessage, ErrorMessageVendorInfo, ModuleType
 from ten_ai_base.transcription import UserTranscription, Word
 from ten_runtime import AsyncTenEnv, AudioFrame
 from .audio_stream import AudioStream, AudioStreamEventType
@@ -39,14 +39,12 @@ async def run_asr_client(client: "SpeechmaticsASRClient"):
 class SpeechmaticsASRClient:
     def __init__(
         self,
-        extension: "SpeechmaticsASRExtension",
         config: SpeechmaticsASRConfig,
         ten_env: AsyncTenEnv,
     ):
         self.config = config
         self.ten_env = ten_env
         self.task = None
-        self.extension = extension
         self.audio_queue = asyncio.Queue()
         self.timeline = AudioTimeline()
         self.audio_stream = AudioStream(
@@ -72,6 +70,8 @@ class SpeechmaticsASRClient:
             speechmatics.models.TranscriptionConfig | None
         ) = None
         self.client: speechmatics.client.WebsocketClient | None = None
+        self.on_transcription: Optional[Callable[[UserTranscription], Awaitable[None]]] = None
+        self.on_error: Optional[Callable[[ErrorMessage, Optional[ErrorMessageVendorInfo]], Awaitable[None]]] = None
 
     async def start(self) -> None:
         """Initialize and start the recognition session"""
@@ -184,7 +184,7 @@ class SpeechmaticsASRClient:
                 turn_id=0,
                 module=ModuleType.STT,
             )
-            await self.extension.send_asr_error(error, vendor_info=None)
+            asyncio.create_task(self._emit_error(error, None))
 
     async def stop(self) -> None:
         self.ten_env.log_info("call stop")
@@ -230,7 +230,7 @@ class SpeechmaticsASRClient:
                     turn_id=0,
                     module=ModuleType.STT,
                 )
-                await self.extension.send_asr_error(error_message, None)
+                asyncio.create_task(self._emit_error(error_message, None))
 
             self.ten_env.log_info(
                 "run end, client_needs_stopping:{}".format(
@@ -286,9 +286,8 @@ class SpeechmaticsASRClient:
                 },
             )
 
-            asyncio.create_task(
-                self.extension.send_asr_transcription(transcription)
-            )
+            if self.on_transcription:
+                asyncio.create_task(self.on_transcription(transcription))
         except Exception as e:
             self.ten_env.log_error(f"Error processing transcript: {e}")
             error_message = ErrorMessage(
@@ -297,9 +296,8 @@ class SpeechmaticsASRClient:
                 turn_id=0,
                 module=ModuleType.STT,
             )
-            asyncio.create_task(
-                self.extension.send_asr_error(error_message, vendor_info=None)
-            )
+
+            asyncio.create_task(self._emit_error(error_message, None))
 
     def _handle_transcript_word_final_mode(self, msg):
         try:
@@ -326,9 +324,8 @@ class SpeechmaticsASRClient:
                     },
                 )
 
-                asyncio.create_task(
-                    self.extension.send_asr_transcription(transcription)
-                )
+                if self.on_transcription:
+                    asyncio.create_task(self.on_transcription(transcription))
         except Exception as e:
             self.ten_env.log_error(f"Error processing transcript: {e}")
             error_message = ErrorMessage(
@@ -337,9 +334,8 @@ class SpeechmaticsASRClient:
                 turn_id=0,
                 module=ModuleType.STT,
             )
-            asyncio.create_task(
-                self.extension.send_asr_error(error_message, vendor_info=None)
-            )
+
+            asyncio.create_task(self._emit_error(error_message, None))
 
     def _handle_transcript_sentence_final_mode(self, msg):
         self.ten_env.log_info(
@@ -394,11 +390,10 @@ class SpeechmaticsASRClient:
                         },
                     )
 
-                    asyncio.create_task(
-                        self.extension.send_asr_transcription(
-                            user_transcription
+                    if self.on_transcription:
+                        asyncio.create_task(
+                            self.on_transcription(user_transcription)
                         )
-                    )
                     self.cache_words = []
 
             # if the transcript is not empty, send it as a partial transcript
@@ -421,9 +416,10 @@ class SpeechmaticsASRClient:
                     },
                 )
 
-                asyncio.create_task(
-                    self.extension.send_asr_transcription(user_transcription)
-                )
+                if self.on_transcription:
+                    asyncio.create_task(
+                        self.on_transcription(user_transcription)
+                    )
         except Exception as e:
             self.ten_env.log_error(f"Error processing transcript: {e}")
             error_message = ErrorMessage(
@@ -432,9 +428,8 @@ class SpeechmaticsASRClient:
                 turn_id=0,
                 module=ModuleType.STT,
             )
-            asyncio.create_task(
-                self.extension.send_asr_error(error_message, vendor_info=None)
-            )
+
+            asyncio.create_task(self._emit_error(error_message, None))
 
     def _handle_end_transcript(self, msg):
         self.ten_env.log_info(f"_handle_end_transcript, msg: {msg}")
@@ -453,16 +448,13 @@ class SpeechmaticsASRClient:
             turn_id=0,
             module=ModuleType.STT,
         )
-        asyncio.create_task(
-            self.extension.send_asr_error(
-                error_message,
-                vendor_info={
-                    "vendor": "speechmatics",
-                    "code": error.code if hasattr(error, "code") else -1,
-                    "message": str(error),
-                },
-            )
-        )
+
+
+        asyncio.create_task(self._emit_error(error_message, {
+            "vendor": "speechmatics",
+            "code": error.code if hasattr(error, "code") else -1,
+            "message": str(error),
+        }))
 
     def _handle_audio_event_started(self, msg):
         self.ten_env.log_info(f"_handle_audio_event_started, msg: {msg}")
@@ -485,3 +477,13 @@ class SpeechmaticsASRClient:
                 }
             )
         return new_words
+
+    async def _emit_error(
+        self, error_message: ErrorMessage, vendor_info: Optional[ErrorMessageVendorInfo] = None
+    ):
+        """
+        Emit an error message to the extension.
+        """
+        self.ten_env.log_error(f"Error: {error_message.message}")
+        if callable(self.on_error):
+            await self.on_error(error_message, vendor_info) # pylint: disable=not-callable

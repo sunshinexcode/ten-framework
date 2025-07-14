@@ -5,6 +5,7 @@
 #
 
 from ten_ai_base.asr import AsyncASRBaseExtension
+from ten_ai_base.transcription import UserTranscription
 from ten_runtime import (
     AsyncTenEnv,
     Cmd,
@@ -43,7 +44,8 @@ class SpeechmaticsASRExtension(AsyncASRBaseExtension):
                     self.ten_env.log_error("get property key failed")
                     return
 
-            self.client = SpeechmaticsASRClient(self, self.config, self.ten_env)
+            self.client = SpeechmaticsASRClient(self.config, self.ten_env)
+            self.client.on_transcription = self._on_transcription
             return await self.client.start()
 
     async def stop_connection(self) -> None:
@@ -61,7 +63,30 @@ class SpeechmaticsASRExtension(AsyncASRBaseExtension):
         return True
 
     def is_connected(self) -> bool:
-        return self.client.client.session_running
+        return bool(
+            self.client
+            and getattr(self.client.client, "session_running", False)
+        )
 
     def input_audio_sample_rate(self) -> int:
         return self.config.sample_rate
+
+    async def _on_transcription(
+        self,
+        user_transcription: UserTranscription,
+    ) -> None:
+        # Convert the transcription to UserTranscription and send
+        self.ten_env.log_info(
+            f"Transcription received: {user_transcription.text}"
+        )
+        await self.send_asr_transcription(user_transcription)
+
+
+    async def _on_error(
+        self,
+        error: Exception,
+        vendor_info: dict | None = None,
+    ) -> None:
+        # Handle errors from the ASR client
+        self.ten_env.log_error(f"ASR error: {error}")
+        await self.send_asr_error(error, vendor_info)

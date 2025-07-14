@@ -25,10 +25,10 @@ from ten_runtime import (
 )
 
 # We must import it, which means this test fixture will be automatically executed
-from .mock import patch_azure_ws  # noqa: F401
+from .mock import patch_speechmatics_ws  # noqa: F401
 
 
-class ExtensionTesterAzure(AsyncExtensionTester):
+class ExtensionTesterSpeechmatics(AsyncExtensionTester):
     def __init__(self):
         super().__init__()
         self.stopped = False
@@ -104,104 +104,22 @@ class ExtensionTesterAzure(AsyncExtensionTester):
         print("on_stop_done")
 
 
-def test_azure(patch_azure_ws):
-    def fake_start_continuous_recognition_async_get():
-
-        def triggerRecognized():
-            evt = SimpleNamespace(
-                result=SimpleNamespace(
-                    json=json.dumps(
-                        {
-                            "DisplayText": "hello world",
-                            "Offset": 0,
-                            "Duration": 5000000,
-                        }
-                    )
-                )
-            )
-            patch_azure_ws.event_handlers["recognized"](evt)
-
-        threading.Timer(1.0, triggerRecognized).start()
-        return None
-
-    start_future = MagicMock()
-    start_future.get.side_effect = fake_start_continuous_recognition_async_get
-
-    # Inject into recognizer
-    patch_azure_ws.recognizer_instance.start_continuous_recognition_async.return_value = (
-        start_future
-    )
-    stop_future = MagicMock()
-    stop_future.get.return_value = None
-    patch_azure_ws.recognizer_instance.stop_continuous_recognition_async.return_value = (
-        stop_future
-    )
-
-    tester = ExtensionTesterAzure()
+def test_bytedance_basic(patch_speechmatics_ws):
+    tester = ExtensionTesterSpeechmatics()
     tester.set_test_mode_single(
-        "azure_asr_python",
+        "speechmatics_asr_python",
         json.dumps(
             {
-                "api_key": "111",
-                "language": "en-US",
-                "model": "nova-2",
+                "key": "mock_key",
                 "sample_rate": 16000,
-                "params": {"test": "123"},
+                "drain_mode": "disconnect",
             }
         ),
     )
 
     error = tester.run()
+
+    if error is not None:
+        print("Test completed with error:", error.error_message())
+
     assert error is None
-
-
-def test_azure_unexpected_result(patch_azure_ws):
-    def fake_start_continuous_recognition_async_get():
-
-        def triggerRecognized():
-            evt = SimpleNamespace(
-                result=SimpleNamespace(
-                    json=json.dumps(
-                        {
-                            "DisplayText": "goodbye world",
-                            "Offset": 0,
-                            "Duration": 5000000,
-                        }
-                    )
-                )
-            )
-            patch_azure_ws.event_handlers["recognized"](evt)
-
-        threading.Timer(1.0, triggerRecognized).start()
-        return None
-
-    start_future = MagicMock()
-    start_future.get.side_effect = fake_start_continuous_recognition_async_get
-
-    # Inject into recognizer
-    patch_azure_ws.recognizer_instance.start_continuous_recognition_async.return_value = (
-        start_future
-    )
-    stop_future = MagicMock()
-    stop_future.get.return_value = None
-    patch_azure_ws.recognizer_instance.stop_continuous_recognition_async.return_value = (
-        stop_future
-    )
-
-    tester = ExtensionTesterAzure()
-    tester.set_test_mode_single(
-        "azure_asr_python",
-        json.dumps(
-            {
-                "api_key": "111",
-                "language": "en-US",
-                "model": "nova-2",
-                "sample_rate": 16000,
-            }
-        ),
-    )
-
-    error = tester.run()
-    assert error is not None
-    assert error.error_code() == TenErrorCode.ErrorCodeGeneric
-    assert error.error_message() == "unexpected text: goodbye world"
