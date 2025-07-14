@@ -95,21 +95,24 @@ class ExtensionTesterGladia(AsyncExtensionTester):
 
         print("on_stop_done")
 
+
 def test_gladia(patch_gladia_ws):
     # yield one transcript message
     async def fake_iter():
         await asyncio.sleep(1)
-        yield json.dumps({
-            "type": "transcript",
-            "data": {
-                "is_final": True,
-                "utterance": {
-                    "start": 0,
-                    "end": 0.5,
-                    "text": "hello world"
-                }
+        yield json.dumps(
+            {
+                "type": "transcript",
+                "data": {
+                    "is_final": True,
+                    "utterance": {
+                        "start": 0,
+                        "end": 0.5,
+                        "text": "hello world",
+                    },
+                },
             }
-        })
+        )
 
     patch_gladia_ws.__aiter__.side_effect = fake_iter
 
@@ -136,17 +139,19 @@ def test_gladia_unexpected_result(patch_gladia_ws):
     # yield one transcript message
     async def fake_iter():
         await asyncio.sleep(1)
-        yield json.dumps({
-            "type": "transcript",
-            "data": {
-                "is_final": True,
-                "utterance": {
-                    "start": 0,
-                    "end": 0.5,
-                    "text": "bad text"  # This is unexpected
-                }
+        yield json.dumps(
+            {
+                "type": "transcript",
+                "data": {
+                    "is_final": True,
+                    "utterance": {
+                        "start": 0,
+                        "end": 0.5,
+                        "text": "bad text",  # This is unexpected
+                    },
+                },
             }
-        })
+        )
 
     patch_gladia_ws.__aiter__.side_effect = fake_iter
 

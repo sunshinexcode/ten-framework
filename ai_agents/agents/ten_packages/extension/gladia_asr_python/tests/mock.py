@@ -12,14 +12,17 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 @pytest.fixture(scope="function")
 def patch_gladia_ws():
-    with patch("ten_packages.extension.gladia_asr_python.extension.requests.post") as mock_post, \
-         patch("ten_packages.extension.gladia_asr_python.extension.websockets.connect") as mock_connect:
+    with patch(
+        "ten_packages.extension.gladia_asr_python.extension.requests.post"
+    ) as mock_post, patch(
+        "ten_packages.extension.gladia_asr_python.extension.websockets.connect"
+    ) as mock_connect:
 
         # Mock POST /v2/live
         mock_post.return_value = MagicMock(
             ok=True,
             json=lambda: {"url": "wss://mock.gladia.io/stream"},
-            status_code=200
+            status_code=200,
         )
 
         # Mock websocket

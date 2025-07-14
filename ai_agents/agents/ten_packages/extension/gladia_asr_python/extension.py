@@ -28,12 +28,11 @@ class GladiaASRConfig(BaseModel):
     sample_rate: int = 16000
 
 
-
 class GladiaASRExtension(AsyncASRBaseExtension):
     def __init__(self, name: str):
         super().__init__(name)
         self.config: Optional[GladiaASRConfig] = None
-        self.ws: Optional[websockets.WebSocketClientProtocol] = None
+        self.ws: Optional[websockets.client.ClientProtocol] = None
         self.ws_loop: Optional[asyncio.Task] = None
         self.last_finalize_timestamp: int = 0
         self.connected = False
@@ -106,7 +105,9 @@ class GladiaASRExtension(AsyncASRBaseExtension):
             utterance = result["utterance"]
             text = utterance.get("text", "").strip()
             start_ms = int(utterance.get("start", 0) * 1000)
-            duration_ms = int((utterance.get("end", 0) - utterance.get("start", 0)) * 1000)
+            duration_ms = int(
+                (utterance.get("end", 0) - utterance.get("start", 0)) * 1000
+            )
 
             final_from_finalize = True
             await self._finalize_counter_if_needed(final_from_finalize)
@@ -123,7 +124,9 @@ class GladiaASRExtension(AsyncASRBaseExtension):
         except Exception as e:
             await self._handle_error(e)
 
-    async def send_audio(self, frame: AudioFrame, session_id: Optional[str]) -> None:
+    async def send_audio(
+        self, frame: AudioFrame, session_id: Optional[str]
+    ) -> None:
         try:
             chunk = base64.b64encode(frame.get_buf()).decode("utf-8")
             msg = json.dumps({"type": "audio_chunk", "data": {"chunk": chunk}})
@@ -166,7 +169,9 @@ class GladiaASRExtension(AsyncASRBaseExtension):
                 turn_id=0,
                 module=ModuleType.STT,
             ),
-            ErrorMessageVendorInfo(vendor="gladia", code=-1, message=str(error)),
+            ErrorMessageVendorInfo(
+                vendor="gladia", code=-1, message=str(error)
+            ),
         )
 
     async def _finalize_counter_if_needed(self, is_final: bool) -> None:
