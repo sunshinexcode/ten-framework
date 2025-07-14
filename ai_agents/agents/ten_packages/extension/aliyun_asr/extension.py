@@ -17,6 +17,7 @@ import json
 
 from dataclasses import dataclass, field
 
+
 @dataclass
 class AliyunASRConfig(BaseModel):
     # Refer to: https://help.aliyun.com/zh/isi/developer-reference/sdk-for-python-2.

@@ -16,7 +16,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 @pytest.fixture(scope="function")
 def patch_bytedance_ws():
     # Patch the Bytedance AsrWsClient constructor
-    with patch("ten_packages.extension.bytedance_asr.extension.AsrWsClient") as MockClient:
+    with patch(
+        "ten_packages.extension.bytedance_asr.extension.AsrWsClient"
+    ) as MockClient:
         mock_client = MagicMock()
         callback_store = {}
 
@@ -34,10 +36,14 @@ def patch_bytedance_ws():
             async def delayed_message():
                 await asyncio.sleep(1)
                 if callback_store.get("on_message"):
-                    await callback_store["on_message"]([{
-                        "text": "hello world",
-                        "utterances": [{"definite": True}]
-                    }])
+                    await callback_store["on_message"](
+                        [
+                            {
+                                "text": "hello world",
+                                "utterances": [{"definite": True}],
+                            }
+                        ]
+                    )
 
             asyncio.get_event_loop().create_task(delayed_message())
 

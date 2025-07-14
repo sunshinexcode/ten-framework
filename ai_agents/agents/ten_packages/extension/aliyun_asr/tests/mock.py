@@ -30,12 +30,14 @@ def patch_aliyun_ws():
 
     class MockNlsSpeechTranscriber:
         def __init__(self, **kwargs):
-            callback_store.update({
-                "on_start": kwargs.get("on_start"),
-                "on_sentence_end": kwargs.get("on_sentence_end"),
-                "on_error": kwargs.get("on_error"),
-                "on_close": kwargs.get("on_close"),
-            })
+            callback_store.update(
+                {
+                    "on_start": kwargs.get("on_start"),
+                    "on_sentence_end": kwargs.get("on_sentence_end"),
+                    "on_error": kwargs.get("on_error"),
+                    "on_close": kwargs.get("on_close"),
+                }
+            )
 
         def start(self, *args, **kwargs):
             print("[mock] start() called")
@@ -45,10 +47,12 @@ def patch_aliyun_ws():
             async def delayed_sentence():
                 await asyncio.sleep(1)
                 if callback_store.get("on_sentence_end"):
-                    result_json = json.dumps({
-                        "payload": {"result": "hello world"},
-                        "header": {"name": "SentenceEnd"}
-                    })
+                    result_json = json.dumps(
+                        {
+                            "payload": {"result": "hello world"},
+                            "header": {"name": "SentenceEnd"},
+                        }
+                    )
                     callback_store["on_sentence_end"](result_json)
 
             asyncio.get_event_loop().create_task(delayed_sentence())
@@ -62,8 +66,11 @@ def patch_aliyun_ws():
     fake_nls.NlsSpeechTranscriber = MockNlsSpeechTranscriber
 
     # Step 4: inject both nls and nls.token into sys.modules
-    with patch.dict(sys.modules, {
-        "nls": fake_nls,
-        "nls.token": fake_token_module,
-    }):
+    with patch.dict(
+        sys.modules,
+        {
+            "nls": fake_nls,
+            "nls.token": fake_token_module,
+        },
+    ):
         yield fake_nls

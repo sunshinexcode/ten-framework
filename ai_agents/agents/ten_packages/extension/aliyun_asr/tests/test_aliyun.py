@@ -75,11 +75,16 @@ class ExtensionTesterAliyun(AsyncExtensionTester):
 
 def test_aliyun_basic(patch_aliyun_ws):
     tester = ExtensionTesterAliyun()
-    tester.set_test_mode_single("aliyun_asr", json.dumps({
-        "appkey": "dummy_appkey",
-        "akid": "dummy_akid",
-        "aksecret": "dummy_aksecret"
-    }))
+    tester.set_test_mode_single(
+        "aliyun_asr",
+        json.dumps(
+            {
+                "appkey": "dummy_appkey",
+                "akid": "dummy_akid",
+                "aksecret": "dummy_aksecret",
+            }
+        ),
+    )
 
     error = tester.run()
 

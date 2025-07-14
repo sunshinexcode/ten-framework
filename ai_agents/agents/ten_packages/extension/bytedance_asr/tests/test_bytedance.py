@@ -75,10 +75,15 @@ class ExtensionTesterBytedance(AsyncExtensionTester):
 
 def test_bytedance_basic(patch_bytedance_ws):
     tester = ExtensionTesterBytedance()
-    tester.set_test_mode_single("bytedance_asr", json.dumps({
-        "appid": "dummy_app_id",
-        "token": "dummy_token",
-    }))
+    tester.set_test_mode_single(
+        "bytedance_asr",
+        json.dumps(
+            {
+                "appid": "dummy_app_id",
+                "token": "dummy_token",
+            }
+        ),
+    )
 
     error = tester.run()
 
