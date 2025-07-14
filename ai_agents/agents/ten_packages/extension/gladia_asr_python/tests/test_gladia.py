@@ -19,36 +19,26 @@ from ten_runtime import (
 )
 
 # We must import it, which means this test fixture will be automatically executed
-from .mock import patch_deepgram_ws  # noqa: F401
+from .mock import patch_gladia_ws  # noqa: F401
 
 
-class ExtensionTesterDeepgram(AsyncExtensionTester):
+class ExtensionTesterGladia(AsyncExtensionTester):
     def __init__(self):
         super().__init__()
+        self.stopped = False
 
     async def audio_sender(self, ten_env: AsyncTenEnvTester):
-        # audio file path: ../test_data/test.pcm
-        audio_file_path = os.path.join(
-            os.path.dirname(__file__), "test_data/16k_en_US.pcm"
-        )
-
-        print(f"audio_file_path: {audio_file_path}")
-
-        with open(audio_file_path, "rb") as audio_file:
-            chunk_size = 320
-            while True:
-                chunk = audio_file.read(chunk_size)
-                if not chunk:
-                    break
-                audio_frame = AudioFrame.create("pcm_frame")
-                audio_frame.set_property_int("stream_id", 123)
-                audio_frame.set_property_string("remote_user_id", "123")
-                audio_frame.alloc_buf(len(chunk))
-                buf = audio_frame.lock_buf()
-                buf[:] = chunk
-                audio_frame.unlock_buf(buf)
-                await ten_env.send_audio_frame(audio_frame)
-                await asyncio.sleep(0.01)
+        while not self.stopped:
+            chunk = b"\x01\x02" * 160
+            audio_frame = AudioFrame.create("pcm_frame")
+            audio_frame.set_property_int("stream_id", 123)
+            audio_frame.set_property_string("remote_user_id", "123")
+            audio_frame.alloc_buf(len(chunk))
+            buf = audio_frame.lock_buf()
+            buf[:] = chunk
+            audio_frame.unlock_buf(buf)
+            await ten_env.send_audio_frame(audio_frame)
+            await asyncio.sleep(0.1)
 
     async def on_start(self, ten_env: AsyncTenEnvTester) -> None:
         # Create a task to read pcm file and send to extension
@@ -89,6 +79,7 @@ class ExtensionTesterDeepgram(AsyncExtensionTester):
             ten_env.stop_test()
 
     async def on_stop(self, ten_env: AsyncTenEnvTester) -> None:
+        self.stopped = True
         ten_env.log_info("Stopping audio sender task...")
         self.sender_task.cancel()
         try:
@@ -104,36 +95,31 @@ class ExtensionTesterDeepgram(AsyncExtensionTester):
 
         print("on_stop_done")
 
-
-def test_deepgram(patch_deepgram_ws):
-    async def fake_start(*args, **kwargs):
+def test_gladia(patch_gladia_ws):
+    # yield one transcript message
+    async def fake_iter():
         await asyncio.sleep(1)
-        handler = patch_deepgram_ws._handlers.get("Results")
-        if handler:
-            await handler(
-                None,
-                SimpleNamespace(
-                    channel=SimpleNamespace(
-                        alternatives=[SimpleNamespace(transcript="hello world")]
-                    ),
-                    start=0.0,
-                    duration=0.5,
-                    is_final=True,
-                    from_finalize=True,  # Simulate a finalization event
-                ),
-            )
-        return True
+        yield json.dumps({
+            "type": "transcript",
+            "data": {
+                "is_final": True,
+                "utterance": {
+                    "start": 0,
+                    "end": 0.5,
+                    "text": "hello world"
+                }
+            }
+        })
 
-    patch_deepgram_ws.start.side_effect = fake_start
+    patch_gladia_ws.__aiter__.side_effect = fake_iter
 
-    tester = ExtensionTesterDeepgram()
+    tester = ExtensionTesterGladia()
     tester.set_test_mode_single(
-        "deepgram_asr_python",
+        "gladia_asr_python",
         json.dumps(
             {
                 "api_key": "111",
                 "language": "en-US",
-                "model": "nova-2",
                 "sample_rate": 16000,
             }
         ),
@@ -143,41 +129,34 @@ def test_deepgram(patch_deepgram_ws):
 
     if error is not None:
         print(f"Error occurred: {error.error_message()}")
-
     assert error is None
 
 
-def test_deepgram_unexpected_result(patch_deepgram_ws):
-    async def fake_start(*args, **kwargs):
+def test_gladia_unexpected_result(patch_gladia_ws):
+    # yield one transcript message
+    async def fake_iter():
         await asyncio.sleep(1)
-        handler = patch_deepgram_ws._handlers.get("Results")
-        if handler:
-            await handler(
-                None,
-                SimpleNamespace(
-                    channel=SimpleNamespace(
-                        alternatives=[
-                            SimpleNamespace(transcript="goodbye world")
-                        ]
-                    ),
-                    start=0.0,
-                    duration=0.5,
-                    is_final=True,
-                    from_finalize=True,  # Simulate a finalization event
-                ),
-            )
-        return True
+        yield json.dumps({
+            "type": "transcript",
+            "data": {
+                "is_final": True,
+                "utterance": {
+                    "start": 0,
+                    "end": 0.5,
+                    "text": "bad text"  # This is unexpected
+                }
+            }
+        })
 
-    patch_deepgram_ws.start.side_effect = fake_start
+    patch_gladia_ws.__aiter__.side_effect = fake_iter
 
-    tester = ExtensionTesterDeepgram()
+    tester = ExtensionTesterGladia()
     tester.set_test_mode_single(
-        "deepgram_asr_python",
+        "gladia_asr_python",
         json.dumps(
             {
                 "api_key": "111",
                 "language": "en-US",
-                "model": "nova-2",
                 "sample_rate": 16000,
             }
         ),
@@ -186,4 +165,4 @@ def test_deepgram_unexpected_result(patch_deepgram_ws):
     error = tester.run()
     assert error is not None
     assert error.error_code() == TenErrorCode.ErrorCodeGeneric
-    assert error.error_message() == "unexpected text: goodbye world"
+    assert error.error_message() == "unexpected text: bad text"
