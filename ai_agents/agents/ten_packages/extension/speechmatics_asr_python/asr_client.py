@@ -499,6 +499,6 @@ class SpeechmaticsASRClient:
         """
         self.ten_env.log_error(f"Error: {error_message.message}")
         if callable(self.on_error):
-            await self.on_error(
+            await self.on_error(  # pylint: disable=not-callable
                 error_message, vendor_info
-            )  # pylint: disable=not-callable
+            )
