@@ -6,7 +6,7 @@
     {
       "type": "system",
       "name": "ten_runtime_python",
-      "version": "0.8.18"
+      "version": "=0.10.18"
     }
   ],
   "package": {
@@ -54,37 +54,9 @@
         }
       }
     },
-    "data_in": [
+    "cmd_in": [
       {
-        "name": "text_data",
-        "property": {
-          "text": {
-            "type": "string"
-          },
-          "is_final": {
-            "type": "bool"
-          },
-          "stream_id": {
-            "type": "uint32"
-          },
-          "end_of_segment": {
-            "type": "bool"
-          }
-        }
-      },
-      {
-        "name": "content_data",
-        "property": {
-          "text": {
-            "type": "string"
-          },
-          "end_of_segment": {
-            "type": "bool"
-          },
-          "stream_id": {
-            "type": "uint32"
-          }
-        }
+        "name": "flush"
       }
     ],
     "cmd_out": [
@@ -92,9 +64,41 @@
         "name": "flush"
       }
     ],
-    "cmd_in": [
+    "data_in": [
       {
-        "name": "flush"
+        "name": "text_data",
+        "property": {
+          "properties": {
+            "text": {
+              "type": "string"
+            },
+            "is_final": {
+              "type": "bool"
+            },
+            "stream_id": {
+              "type": "uint32"
+            },
+            "end_of_segment": {
+              "type": "bool"
+            }
+          }
+        }
+      },
+      {
+        "name": "content_data",
+        "property": {
+          "properties": {
+            "text": {
+              "type": "string"
+            },
+            "end_of_segment": {
+              "type": "bool"
+            },
+            "stream_id": {
+              "type": "uint32"
+            }
+          }
+        }
       }
     ]
   },
