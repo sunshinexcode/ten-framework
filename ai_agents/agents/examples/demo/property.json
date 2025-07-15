@@ -77,6 +77,12 @@
               "property": {
                 "api_key": "${env:WEATHERAPI_API_KEY|}"
               }
+            },
+            {
+              "type": "extension",
+              "name": "adapter",
+              "extension_group": "default",
+              "addon": "data_adapter_python"
             }
           ],
           "connections": [
@@ -108,6 +114,19 @@
                   ]
                 }
               ],
+              "data": [
+                {
+                  "name": "text_data",
+                  "dest": [
+                    {
+                      "extension": "adapter"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "extension": "adapter",
               "data": [
                 {
                   "name": "text_data",
@@ -316,6 +335,12 @@
               "property": {
                 "api_key": "${env:WEATHERAPI_API_KEY|}"
               }
+            },
+            {
+              "type": "extension",
+              "name": "adapter",
+              "extension_group": "default",
+              "addon": "data_adapter_python"
             }
           ],
           "connections": [
@@ -347,6 +372,19 @@
                   ]
                 }
               ],
+              "data": [
+                {
+                  "name": "text_data",
+                  "dest": [
+                    {
+                      "extension": "adapter"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "extension": "adapter",
               "data": [
                 {
                   "name": "text_data",
@@ -545,6 +583,12 @@
               "addon": "message_collector",
               "extension_group": "transcriber",
               "property": {}
+            },
+            {
+              "type": "extension",
+              "name": "adapter",
+              "extension_group": "default",
+              "addon": "data_adapter_python"
             }
           ],
           "connections": [
@@ -576,6 +620,19 @@
                   ]
                 }
               ],
+              "data": [
+                {
+                  "name": "text_data",
+                  "dest": [
+                    {
+                      "extension": "adapter"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "extension": "adapter",
               "data": [
                 {
                   "name": "text_data",
@@ -754,6 +811,12 @@
               "addon": "message_collector",
               "extension_group": "transcriber",
               "property": {}
+            },
+            {
+              "type": "extension",
+              "name": "adapter",
+              "extension_group": "default",
+              "addon": "data_adapter_python"
             }
           ],
           "connections": [
@@ -785,6 +848,19 @@
                   ]
                 }
               ],
+              "data": [
+                {
+                  "name": "text_data",
+                  "dest": [
+                    {
+                      "extension": "adapter"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "extension": "adapter",
               "data": [
                 {
                   "name": "text_data",
@@ -1156,6 +1232,12 @@
               "property": {
                 "api_key": "${env:BING_API_KEY|}"
               }
+            },
+            {
+              "type": "extension",
+              "name": "adapter",
+              "extension_group": "default",
+              "addon": "data_adapter_python"
             }
           ],
           "connections": [
@@ -1192,10 +1274,7 @@
                   "name": "text_data",
                   "dest": [
                     {
-                      "extension": "interrupt_detector"
-                    },
-                    {
-                      "extension": "message_collector"
+                      "extension": "adapter"
                     }
                   ]
                 }
@@ -1206,6 +1285,22 @@
                   "dest": [
                     {
                       "extension": "vision_tool_python"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "extension": "adapter",
+              "data": [
+                {
+                  "name": "text_data",
+                  "dest": [
+                    {
+                      "extension": "interrupt_detector"
+                    },
+                    {
+                      "extension": "message_collector"
                     }
                   ]
                 }
@@ -1832,6 +1927,12 @@
               "name": "message_collector",
               "addon": "message_collector",
               "extension_group": "transcriber"
+            },
+            {
+              "type": "extension",
+              "name": "adapter",
+              "extension_group": "default",
+              "addon": "data_adapter_python"
             }
           ],
           "connections": [
@@ -1855,6 +1956,19 @@
                   ]
                 }
               ],
+              "data": [
+                {
+                  "name": "text_data",
+                  "dest": [
+                    {
+                      "extension": "adapter"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "extension": "adapter",
               "data": [
                 {
                   "name": "text_data",
@@ -2543,6 +2657,12 @@
               "addon": "message_collector",
               "extension_group": "transcriber",
               "property": {}
+            },
+            {
+              "type": "extension",
+              "name": "adapter",
+              "extension_group": "default",
+              "addon": "data_adapter_python"
             }
           ],
           "connections": [
@@ -2574,6 +2694,19 @@
                   ]
                 }
               ],
+              "data": [
+                {
+                  "name": "text_data",
+                  "dest": [
+                    {
+                      "extension": "adapter"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "extension": "adapter",
               "data": [
                 {
                   "name": "text_data",
@@ -2753,6 +2886,12 @@
               "property": {
                 "api_key": "${env:OPENAI_API_KEY}"
               }
+            },
+            {
+              "type": "extension",
+              "name": "adapter",
+              "extension_group": "default",
+              "addon": "data_adapter_python"
             }
           ],
           "connections": [
@@ -2784,6 +2923,19 @@
                   ]
                 }
               ],
+              "data": [
+                {
+                  "name": "text_data",
+                  "dest": [
+                    {
+                      "extension": "adapter"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "extension": "adapter",
               "data": [
                 {
                   "name": "text_data",
@@ -3009,6 +3161,17 @@
               "addon": "message_collector",
               "extension_group": "transcriber",
               "property": {}
+            },
+            {
+              "type": "extension",
+              "name": "adapter",
+              "extension_group": "default",
+              "addon": "data_adapter_python"
+            },
+            {
+              "type": "extension",
+              "name": "streamid_adapter",
+              "addon": "streamid_adapter"
             }
           ],
           "connections": [
@@ -3045,7 +3208,7 @@
                   "name": "pcm_frame",
                   "dest": [
                     {
-                      "extension": "stt"
+                      "extension": "streamid_adapter"
                     }
                   ]
                 }
@@ -3065,6 +3228,19 @@
               "extension": "stt",
               "data": [
                 {
+                  "name": "asr_result",
+                  "dest": [
+                    {
+                      "extension": "adapter"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "extension": "adapter",
+              "data": [
+                {
                   "name": "text_data",
                   "dest": [
                     {
@@ -3072,6 +3248,19 @@
                     },
                     {
                       "extension": "message_collector"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "extension": "streamid_adapter",
+              "audio_frame": [
+                {
+                  "name": "pcm_frame",
+                  "dest": [
+                    {
+                      "extension": "stt"
                     }
                   ]
                 }

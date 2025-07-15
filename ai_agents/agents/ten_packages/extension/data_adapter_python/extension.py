@@ -69,3 +69,21 @@ class DataAdapterExtension(AsyncExtension):
             output.set_property_int("stream_id", stream_id)
 
             await ten_env.send_data(output)
+        if data_name == "text_data":
+            json_str, _ = data.get_property_to_json(None)
+
+            json_data = json.loads(json_str)
+            text = json_data.get("text", "")
+            final = json_data.get("final", False)
+            metadata = json_data.get("metadata", {})
+            stream_id = int(json_data.get("stream_id", "100"))
+
+            ten_env.log_info(f"Received ASR result: {json_str}")
+
+            output = Data.create("text_data")
+            output.set_property_string("text", text)
+            output.set_property_bool("is_final", final)
+            output.set_property_bool("end_of_segment", final)
+            output.set_property_int("stream_id", stream_id)
+
+            await ten_env.send_data(output)
