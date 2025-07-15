@@ -69,6 +69,12 @@
               "addon": "message_collector",
               "extension_group": "transcriber",
               "property": {}
+            },
+            {
+              "type": "extension",
+              "name": "adapter",
+              "extension_group": "default",
+              "addon": "data_adapter_python"
             }
           ],
           "connections": [
@@ -100,6 +106,19 @@
                   ]
                 }
               ],
+              "data": [
+                {
+                  "name": "text_data",
+                  "dest": [
+                    {
+                      "extension": "adapter"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "extension": "adapter",
               "data": [
                 {
                   "name": "text_data",
@@ -278,6 +297,12 @@
               "addon": "message_collector",
               "extension_group": "transcriber",
               "property": {}
+            },
+            {
+              "type": "extension",
+              "name": "adapter",
+              "extension_group": "default",
+              "addon": "data_adapter_python"
             }
           ],
           "connections": [
@@ -309,6 +334,19 @@
                   ]
                 }
               ],
+              "data": [
+                {
+                  "name": "text_data",
+                  "dest": [
+                    {
+                      "extension": "adapter"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "extension": "adapter",
               "data": [
                 {
                   "name": "text_data",
