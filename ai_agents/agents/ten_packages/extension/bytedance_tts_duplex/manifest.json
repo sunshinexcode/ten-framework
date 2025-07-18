@@ -1,0 +1,77 @@
+{
+  "type": "extension",
+  "name": "bytedance_tts_duplex",
+  "version": "0.1.0",
+  "dependencies": [
+    {
+      "type": "system",
+      "name": "ten_runtime_python",
+      "version": "0.10"
+    },
+    {
+      "path": "/tmp/ten_ai_base"
+    }
+  ],
+  "package": {
+    "include": [
+      "manifest.json",
+      "property.json",
+      "BUILD.gn",
+      "**.tent",
+      "**.py",
+      "README.md",
+      "tests/**"
+    ]
+  },
+  "api": {
+    "property": {
+      "properties": {
+        "appid": {
+          "type": "string"
+        },
+        "token": {
+          "type": "string"
+        },
+        "voice_type": {
+          "type": "string"
+        },
+        "sample_rate": {
+          "type": "int64"
+        },
+        "api_url": {
+          "type": "string"
+        },
+        "cluster": {
+          "type": "string"
+        }
+      }
+    },
+    "cmd_in": [
+      {
+        "name": "flush"
+      }
+    ],
+    "cmd_out": [
+      {
+        "name": "flush"
+      }
+    ],
+    "data_in": [
+      {
+        "name": "text_data",
+        "property": {
+          "properties": {
+            "text": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    ],
+    "audio_frame_out": [
+      {
+        "name": "pcm_frame"
+      }
+    ]
+  }
+}

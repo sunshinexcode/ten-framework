@@ -1,0 +1,341 @@
+import asyncio
+import json
+import uuid
+
+import aiofiles
+import websockets
+import time
+import fastrand
+from websockets.asyncio.client import ClientConnection
+
+# https://www.volcengine.com/docs/6561/1329505#%E7%A4%BA%E4%BE%8Bsamples
+
+
+PROTOCOL_VERSION = 0b0001
+DEFAULT_HEADER_SIZE = 0b0001
+
+# Message Type:
+FULL_CLIENT_REQUEST = 0b0001
+AUDIO_ONLY_RESPONSE = 0b1011
+FULL_SERVER_RESPONSE = 0b1001
+ERROR_INFORMATION = 0b1111
+
+# Message Type Specific Flags
+MsgTypeFlagNoSeq = 0b0000  # Non-terminal packet with no sequence
+MsgTypeFlagPositiveSeq = 0b1  # Non-terminal packet with sequence > 0
+MsgTypeFlagLastNoSeq = 0b10  # last packet with no sequence
+MsgTypeFlagNegativeSeq = 0b11  # Payload contains event number (int32)
+MsgTypeFlagWithEvent = 0b100
+# Message Serialization
+NO_SERIALIZATION = 0b0000
+JSON = 0b0001
+# Message Compression
+COMPRESSION_NO = 0b0000
+COMPRESSION_GZIP = 0b0001
+
+EVENT_NONE = 0
+EVENT_Start_Connection = 1
+
+EVENT_FinishConnection = 2
+
+EVENT_ConnectionStarted = 50  # connection successfully started
+
+EVENT_ConnectionFailed = 51  # connection failed
+
+EVENT_ConnectionFinished = 52  # connection finished
+
+# start session event
+EVENT_StartSession = 100
+
+EVENT_FinishSession = 102
+# 下行Session事件
+EVENT_SessionStarted = 150
+EVENT_SessionFinished = 152
+
+EVENT_SessionFailed = 153
+
+# client request
+EVENT_TaskRequest = 200
+
+# server response
+EVENT_TTSSentenceStart = 350
+
+EVENT_TTSSentenceEnd = 351
+
+EVENT_TTSResponse = 352
+
+
+class Header:
+    def __init__(self,
+                 protocol_version=PROTOCOL_VERSION,
+                 header_size=DEFAULT_HEADER_SIZE,
+                 message_type: int = 0,
+                 message_type_specific_flags: int = 0,
+                 serial_method: int = NO_SERIALIZATION,
+                 compression_type: int = COMPRESSION_NO,
+                 reserved_data=0):
+        self.header_size = header_size
+        self.protocol_version = protocol_version
+        self.message_type = message_type
+        self.message_type_specific_flags = message_type_specific_flags
+        self.serial_method = serial_method
+        self.compression_type = compression_type
+        self.reserved_data = reserved_data
+
+    def as_bytes(self) -> bytes:
+        return bytes([
+            (self.protocol_version << 4) | self.header_size,
+            (self.message_type << 4) | self.message_type_specific_flags,
+            (self.serial_method << 4) | self.compression_type,
+            self.reserved_data
+        ])
+
+
+class Optional:
+    def __init__(self, event: int = EVENT_NONE, sessionId: str = None, sequence: int = None):
+        self.event = event
+        self.sessionId = sessionId
+        self.errorCode: int = 0
+        self.connectionId: str | None = None
+        self.response_meta_json: str | None = None
+        self.sequence = sequence
+
+    # to byte sequence
+    def as_bytes(self) -> bytes:
+        option_bytes = bytearray()
+        if self.event != EVENT_NONE:
+            option_bytes.extend(self.event.to_bytes(4, "big", signed=True))
+        if self.sessionId is not None:
+            session_id_bytes = str.encode(self.sessionId)
+            size = len(session_id_bytes).to_bytes(4, "big", signed=True)
+            option_bytes.extend(size)
+            option_bytes.extend(session_id_bytes)
+        if self.sequence is not None:
+            option_bytes.extend(self.sequence.to_bytes(4, "big", signed=True))
+        return option_bytes
+
+
+class Response:
+    def __init__(self, header: Header, optional: Optional):
+        self.optional = optional
+        self.header = header
+        self.payload: bytes | None = None
+        self.payload_json: str | None = None
+
+    def __str__(self):
+        return super().__str__()
+
+
+def parser_response(res) -> Response:
+    """Parse the response from the server."""
+    if isinstance(res, str):
+        raise RuntimeError(res)
+    response = Response(Header(), Optional())
+
+    # header
+    header = response.header
+    num = 0b00001111
+    header.protocol_version = res[0] >> 4 & num
+    header.header_size = res[0] & 0x0f
+    header.message_type = (res[1] >> 4) & num
+    header.message_type_specific_flags = res[1] & 0x0f
+    header.serial_method = res[2] >> num
+    header.compression_type = res[2] & 0x0f
+    header.reserved_data = res[3]
+
+    offset = 4
+    optional = response.optional
+    if header.message_type == FULL_SERVER_RESPONSE or AUDIO_ONLY_RESPONSE:
+        # read event
+        if header.message_type_specific_flags == MsgTypeFlagWithEvent:
+            optional.event = int.from_bytes(res[offset:8])
+            offset += 4
+            if optional.event == EVENT_NONE:
+                return response
+            # read connectionId
+            elif optional.event == EVENT_ConnectionStarted:
+                optional.connectionId, offset = read_res_content(res, offset)
+            elif optional.event == EVENT_ConnectionFailed:
+                optional.response_meta_json, offset = read_res_content(res, offset)
+            elif (optional.event == EVENT_SessionStarted
+                  or optional.event == EVENT_SessionFailed
+                  or optional.event == EVENT_SessionFinished):
+                optional.sessionId, offset = read_res_content(res, offset)
+                optional.response_meta_json, offset = read_res_content(res, offset)
+            elif optional.event == EVENT_TTSResponse:
+                optional.sessionId, offset = read_res_content(res, offset)
+                response.payload, offset = read_res_payload(res, offset)
+            elif optional.event == EVENT_TTSSentenceEnd or optional.event == EVENT_TTSSentenceStart:
+                optional.sessionId, offset = read_res_content(res, offset)
+                response.payload_json, offset = read_res_content(res, offset)
+
+    elif header.message_type == ERROR_INFORMATION:
+        optional.errorCode = int.from_bytes(res[offset:offset + 4], "big", signed=True)
+        offset += 4
+        response.payload, offset = read_res_payload(res, offset)
+    return response
+
+async def send_event(ws: ClientConnection, header: bytes, optional: bytes | None = None,
+                     payload: bytes = None):
+    full_client_request = bytearray(header)
+    if optional is not None:
+        full_client_request.extend(optional)
+    if payload is not None:
+        payload_size = len(payload).to_bytes(4, 'big', signed=True)
+        full_client_request.extend(payload_size)
+        full_client_request.extend(payload)
+    await ws.send(full_client_request)
+
+
+def get_payload_bytes(uid='1234', event=EVENT_NONE, text='', speaker='', audio_format='pcm',
+                      audio_sample_rate=24000):
+    return str.encode(json.dumps(
+        {
+            "user": {"uid": uid},
+            "event": event,
+            "namespace": "BidirectionalTTS",
+            "req_params": {
+                "text": text,
+                "speaker": speaker,
+                "audio_params": {
+                    "format": audio_format,
+                    "sample_rate": audio_sample_rate,
+                    "enable_timestamp": True,
+                }
+            }
+        }
+    ))
+
+
+
+def read_res_content(res: bytes, offset: int):
+    """read content from response bytes"""
+    content_size = int.from_bytes(res[offset: offset + 4])
+    offset += 4
+    content = str(res[offset: offset + content_size], encoding='utf8')
+    offset += content_size
+    return content, offset
+
+
+def read_res_payload(res: bytes, offset: int):
+    """read payload from response bytes"""
+    payload_size = int.from_bytes(res[offset: offset + 4])
+    offset += 4
+    payload = res[offset: offset + payload_size]
+    offset += payload_size
+    return payload, offset
+
+
+class BytedanceV3Client:
+    def __init__(self, app_id: str, token: str, speaker: str):
+        self.app_id = app_id
+        self.token = token
+        self.speaker = speaker
+        self.session_id = uuid.uuid4().hex
+        self.ws: ClientConnection = None
+        self.stop_event = asyncio.Event()
+
+    def gen_log_id(self) -> str:
+        ts = int(time.time() * 1000)
+        r = fastrand.pcg32bounded(1 << 24) + (1 << 20)
+        local_ip = "00000000000000000000000000000000"
+        return f"02{ts}{local_ip}{r:08x}"
+
+    def get_headers(self):
+        return {
+            "X-Api-App-Key": self.app_id,
+            "X-Api-Access-Key": self.token,
+            "X-Api-Resource-Id": 'volc.service_type.10029',
+            "X-Api-Connect-Id": uuid.uuid4(),
+            "X-Tt-Logid": self.gen_log_id(),
+        }
+
+    async def connect(self):
+        url = 'wss://openspeech.bytedance.com/api/v3/tts/bidirection'
+        self.ws = await websockets.connect(url, extra_headers=self.get_headers(), max_size=100_000_000)
+
+    async def start_connection(self):
+        header = Header(message_type=FULL_CLIENT_REQUEST, message_type_specific_flags=MsgTypeFlagWithEvent).as_bytes()
+        optional = Optional(event=EVENT_Start_Connection).as_bytes()
+        payload = b"{}"
+        await send_event(self.ws, header, optional, payload)
+        res = parser_response(await self.ws.recv())
+        self._print_response(res, "start_connection")
+        if res.optional.event != EVENT_ConnectionStarted:
+            raise RuntimeError("Start connection failed")
+
+    async def start_session(self):
+        header = Header(message_type=FULL_CLIENT_REQUEST,
+                        message_type_specific_flags=MsgTypeFlagWithEvent,
+                        serial_method=JSON).as_bytes()
+        optional = Optional(event=EVENT_StartSession, sessionId=self.session_id).as_bytes()
+        payload = get_payload_bytes(event=EVENT_StartSession, speaker=self.speaker)
+        await send_event(self.ws, header, optional, payload)
+        res = parser_response(await self.ws.recv())
+        self._print_response(res, "start_session")
+        if res.optional.event != EVENT_SessionStarted:
+            raise RuntimeError("Start session failed")
+
+    async def send_text(self, text: str):
+        header = Header(message_type=FULL_CLIENT_REQUEST,
+                        message_type_specific_flags=MsgTypeFlagWithEvent,
+                        serial_method=JSON).as_bytes()
+        optional = Optional(event=EVENT_TaskRequest, sessionId=self.session_id).as_bytes()
+        payload = get_payload_bytes(event=EVENT_TaskRequest, text=text, speaker=self.speaker)
+        await send_event(self.ws, header, optional, payload)
+
+    async def finish_session(self):
+        header = Header(message_type=FULL_CLIENT_REQUEST,
+                        message_type_specific_flags=MsgTypeFlagWithEvent,
+                        serial_method=JSON).as_bytes()
+        optional = Optional(event=EVENT_FinishSession, sessionId=self.session_id).as_bytes()
+        await send_event(self.ws, header, optional, b"{}")
+
+    async def finish_connection(self):
+        header = Header(message_type=FULL_CLIENT_REQUEST,
+                        message_type_specific_flags=MsgTypeFlagWithEvent,
+                        serial_method=JSON).as_bytes()
+        optional = Optional(event=EVENT_FinishConnection).as_bytes()
+        await send_event(self.ws, header, optional, b"{}")
+        res = parser_response(await self.ws.recv())
+        self._print_response(res, "finish_connection")
+
+    async def recv_loop(self):
+        pass
+        # async with aiofiles.open(self.output_path, "wb") as f:
+        #     while not self.stop_event.is_set():
+        #         try:
+        #             msg = await self.ws.recv()
+        #         except websockets.ConnectionClosed:
+        #             break
+
+        #         res = parser_response(msg)
+        #         self._print_response(res, "recv_loop")
+
+        #         if res.optional.event == EVENT_TTSResponse and res.header.message_type == AUDIO_ONLY_RESPONSE:
+        #             await f.write(res.payload)
+        #         elif res.optional.event in [EVENT_TTSSentenceStart, EVENT_TTSSentenceEnd]:
+        #             continue
+        #         elif res.optional.event in [EVENT_SessionFinished, EVENT_ConnectionFinished, EVENT_SessionFailed]:
+        #             self.stop_event.set()
+        #         else:
+        #             self.stop_event.set()
+
+    async def run(self):
+        await self.connect()
+        await self.start_connection()
+        await self.start_session()
+
+        recv_task = asyncio.create_task(self.recv_loop())
+        await self.send_text()
+        await self.finish_session()
+
+        await self.stop_event.wait()
+        await self.finish_connection()
+        await recv_task
+
+    def _print_response(self, res: Response, tag: str):
+        print(f"[{tag}] Header: {res.header.__dict__}")
+        print(f"[{tag}] Optional: {res.optional.__dict__}")
+        print(f"[{tag}] Payload Len: {len(res.payload) if res.payload else 0}")
+        print(f"[{tag}] Payload JSON: {res.payload_json}")
