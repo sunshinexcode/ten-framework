@@ -81,6 +81,10 @@ class BytedanceTTSDuplexExtension(AsyncTTS2BaseExtension):
         This is called when the TTS request is made.
         """
         try:
+            if t.text.strip() == "":
+                self.ten_env.log_info("Received empty text for TTS request")
+                yield b""
+                return
             if t.request_id != self.current_request_id:
                 self.ten_env.log_info(f"New TTS request with ID: {t.request_id}")
                 self.current_request_id = t.request_id
