@@ -17,4 +17,6 @@ class BytedanceTTSDuplexExtensionAddon(Addon):
         from .extension import BytedanceTTSDuplexExtension
 
         ten_env.log_info("BytedanceTTSDuplexExtensionAddon on_create_instance")
-        ten_env.on_create_instance_done(BytedanceTTSDuplexExtension(name), context)
+        ten_env.on_create_instance_done(
+            BytedanceTTSDuplexExtension(name), context
+        )

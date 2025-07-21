@@ -7,7 +7,6 @@ import traceback
 from typing import AsyncGenerator
 
 from ten_ai_base.struct import TTSTextInput
-from ten_ai_base.transcription import AssistantTranscription
 from ten_ai_base.tts2 import AsyncTTS2BaseExtension
 from .elevenlabs_tts import ElevenLabsTTS2, ElevenLabsTTS2Config
 from ten_runtime import (

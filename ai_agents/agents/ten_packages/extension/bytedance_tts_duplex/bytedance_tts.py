@@ -4,7 +4,6 @@ from typing import AsyncGenerator, Tuple
 import uuid
 
 import time
-import aiohttp
 import fastrand
 from pydantic import BaseModel
 import websockets
@@ -69,16 +68,17 @@ EVENT_TTSSentenceEnd = 351
 EVENT_TTSResponse = 352
 
 
-
 class Header:
-    def __init__(self,
-                 protocol_version=PROTOCOL_VERSION,
-                 header_size=DEFAULT_HEADER_SIZE,
-                 message_type: int = 0,
-                 message_type_specific_flags: int = 0,
-                 serial_method: int = NO_SERIALIZATION,
-                 compression_type: int = COMPRESSION_NO,
-                 reserved_data=0):
+    def __init__(
+        self,
+        protocol_version=PROTOCOL_VERSION,
+        header_size=DEFAULT_HEADER_SIZE,
+        message_type: int = 0,
+        message_type_specific_flags: int = 0,
+        serial_method: int = NO_SERIALIZATION,
+        compression_type: int = COMPRESSION_NO,
+        reserved_data=0,
+    ):
         self.header_size = header_size
         self.protocol_version = protocol_version
         self.message_type = message_type
@@ -88,16 +88,23 @@ class Header:
         self.reserved_data = reserved_data
 
     def as_bytes(self) -> bytes:
-        return bytes([
-            (self.protocol_version << 4) | self.header_size,
-            (self.message_type << 4) | self.message_type_specific_flags,
-            (self.serial_method << 4) | self.compression_type,
-            self.reserved_data
-        ])
+        return bytes(
+            [
+                (self.protocol_version << 4) | self.header_size,
+                (self.message_type << 4) | self.message_type_specific_flags,
+                (self.serial_method << 4) | self.compression_type,
+                self.reserved_data,
+            ]
+        )
 
 
 class Optional:
-    def __init__(self, event: int = EVENT_NONE, sessionId: str = None, sequence: int = None):
+    def __init__(
+        self,
+        event: int = EVENT_NONE,
+        sessionId: str = None,
+        sequence: int = None,
+    ):
         self.event = event
         self.sessionId = sessionId
         self.errorCode: int = 0
@@ -127,8 +134,6 @@ class Response:
         self.payload: bytes | None = None
         self.payload_json: str | None = None
 
-    def __str__(self):
-        return super().__str__()
 
 class ServerResponse(BaseModel):
     event: int = EVENT_NONE
@@ -138,6 +143,7 @@ class ServerResponse(BaseModel):
     payload_json: str | None = None
     header: dict | None = None
     optional: dict | None = None
+
 
 def parser_response(res) -> Response:
     """Parse the response from the server."""
@@ -149,11 +155,11 @@ def parser_response(res) -> Response:
     header = response.header
     num = 0b00001111
     header.protocol_version = res[0] >> 4 & num
-    header.header_size = res[0] & 0x0f
+    header.header_size = res[0] & 0x0F
     header.message_type = (res[1] >> 4) & num
-    header.message_type_specific_flags = res[1] & 0x0f
+    header.message_type_specific_flags = res[1] & 0x0F
     header.serial_method = res[2] >> num
-    header.compression_type = res[2] & 0x0f
+    header.compression_type = res[2] & 0x0F
     header.reserved_data = res[3]
 
     offset = 4
@@ -161,7 +167,9 @@ def parser_response(res) -> Response:
     if header.message_type == FULL_SERVER_RESPONSE or AUDIO_ONLY_RESPONSE:
         # read event
         if header.message_type_specific_flags == MsgTypeFlagWithEvent:
-            optional.event = int.from_bytes(res[offset : offset + 4], "big", signed=True)
+            optional.event = int.from_bytes(
+                res[offset : offset + 4], "big", signed=True
+            )
             offset += 4
             if optional.event == EVENT_NONE:
                 return response
@@ -169,79 +177,104 @@ def parser_response(res) -> Response:
             elif optional.event == EVENT_ConnectionStarted:
                 optional.connectionId, offset = read_res_content(res, offset)
             elif optional.event == EVENT_ConnectionFailed:
-                optional.response_meta_json, offset = read_res_content(res, offset)
-            elif (optional.event == EVENT_SessionStarted
-                  or optional.event == EVENT_SessionFailed
-                  or optional.event == EVENT_SessionFinished):
+                optional.response_meta_json, offset = read_res_content(
+                    res, offset
+                )
+            elif (
+                optional.event == EVENT_SessionStarted
+                or optional.event == EVENT_SessionFailed
+                or optional.event == EVENT_SessionFinished
+            ):
                 optional.sessionId, offset = read_res_content(res, offset)
-                optional.response_meta_json, offset = read_res_content(res, offset)
+                optional.response_meta_json, offset = read_res_content(
+                    res, offset
+                )
             elif optional.event == EVENT_TTSResponse:
                 optional.sessionId, offset = read_res_content(res, offset)
                 response.payload, offset = read_res_payload(res, offset)
-            elif optional.event == EVENT_TTSSentenceEnd or optional.event == EVENT_TTSSentenceStart:
+            elif (
+                optional.event == EVENT_TTSSentenceEnd
+                or optional.event == EVENT_TTSSentenceStart
+            ):
                 optional.sessionId, offset = read_res_content(res, offset)
                 response.payload_json, offset = read_res_content(res, offset)
 
     elif header.message_type == ERROR_INFORMATION:
-        optional.errorCode = int.from_bytes(res[offset:offset + 4], "big", signed=True)
+        optional.errorCode = int.from_bytes(
+            res[offset : offset + 4], "big", signed=True
+        )
         offset += 4
         response.payload, offset = read_res_payload(res, offset)
     return response
 
-async def send_event(ws: WebSocketClientProtocol, header: bytes, optional: bytes | None = None,
-                     payload: bytes = None):
+
+async def send_event(
+    ws: WebSocketClientProtocol,
+    header: bytes,
+    optional: bytes | None = None,
+    payload: bytes = None,
+):
     if ws is not None:
         full_client_request = bytearray(header)
         if optional is not None:
             full_client_request.extend(optional)
         if payload is not None:
-            payload_size = len(payload).to_bytes(4, 'big', signed=True)
+            payload_size = len(payload).to_bytes(4, "big", signed=True)
             full_client_request.extend(payload_size)
             full_client_request.extend(payload)
         await ws.send(full_client_request)
 
 
-def get_payload_bytes(uid='1234', event=EVENT_NONE, text='', speaker='', audio_format='pcm',
-                      audio_sample_rate=24000):
-    return str.encode(json.dumps(
-        {
-            "user": {"uid": uid},
-            "event": event,
-            "namespace": "BidirectionalTTS",
-            "req_params": {
-                "text": text,
-                "speaker": speaker,
-                "audio_params": {
-                    "format": audio_format,
-                    "sample_rate": audio_sample_rate,
-                    "enable_timestamp": True,
-                }
+def get_payload_bytes(
+    uid="1234",
+    event=EVENT_NONE,
+    text="",
+    speaker="",
+    audio_format="pcm",
+    audio_sample_rate=24000,
+):
+    return str.encode(
+        json.dumps(
+            {
+                "user": {"uid": uid},
+                "event": event,
+                "namespace": "BidirectionalTTS",
+                "req_params": {
+                    "text": text,
+                    "speaker": speaker,
+                    "audio_params": {
+                        "format": audio_format,
+                        "sample_rate": audio_sample_rate,
+                        "enable_timestamp": True,
+                    },
+                },
             }
-        }
-    ))
-
+        )
+    )
 
 
 def read_res_content(res: bytes, offset: int):
     """read content from response bytes"""
-    content_size = int.from_bytes(res[offset: offset + 4], "big", signed=True)
+    content_size = int.from_bytes(res[offset : offset + 4], "big", signed=True)
     offset += 4
-    content = str(res[offset: offset + content_size], encoding='utf8')
+    content = str(res[offset : offset + content_size], encoding="utf8")
     offset += content_size
     return content, offset
 
 
 def read_res_payload(res: bytes, offset: int):
     """read payload from response bytes"""
-    payload_size = int.from_bytes(res[offset: offset + 4], "big", signed=True)
+    payload_size = int.from_bytes(res[offset : offset + 4], "big", signed=True)
     offset += 4
-    payload = res[offset: offset + payload_size]
+    payload = res[offset : offset + payload_size]
     offset += payload_size
     return payload, offset
 
 
 class BytedanceV3Client:
-    def __init__(self, app_id: str, token: str, speaker: str, ten_env: AsyncTenEnv):
+    def __init__(
+        self, app_id: str, token: str, speaker: str, ten_env: AsyncTenEnv
+    ):
         self.app_id = app_id
         self.token = token
         self.speaker = speaker
@@ -261,17 +294,22 @@ class BytedanceV3Client:
         return {
             "X-Api-App-Key": self.app_id,
             "X-Api-Access-Key": self.token,
-            "X-Api-Resource-Id": 'volc.service_type.10029',
+            "X-Api-Resource-Id": "volc.service_type.10029",
             "X-Api-Connect-Id": uuid.uuid4(),
             "X-Tt-Logid": self.gen_log_id(),
         }
 
     async def connect(self):
-        url = 'wss://openspeech.bytedance.com/api/v3/tts/bidirection'
-        self.ws = await websockets.connect(url, additional_headers=self.get_headers(), max_size=100_000_000)
+        url = "wss://openspeech.bytedance.com/api/v3/tts/bidirection"
+        self.ws = await websockets.connect(
+            url, additional_headers=self.get_headers(), max_size=100_000_000
+        )
 
     async def start_connection(self):
-        header = Header(message_type=FULL_CLIENT_REQUEST, message_type_specific_flags=MsgTypeFlagWithEvent).as_bytes()
+        header = Header(
+            message_type=FULL_CLIENT_REQUEST,
+            message_type_specific_flags=MsgTypeFlagWithEvent,
+        ).as_bytes()
         optional = Optional(event=EVENT_Start_Connection).as_bytes()
         payload = b"{}"
         await send_event(self.ws, header, optional, payload)
@@ -281,11 +319,17 @@ class BytedanceV3Client:
             raise RuntimeError("Start connection failed")
 
     async def start_session(self):
-        header = Header(message_type=FULL_CLIENT_REQUEST,
-                        message_type_specific_flags=MsgTypeFlagWithEvent,
-                        serial_method=JSON).as_bytes()
-        optional = Optional(event=EVENT_StartSession, sessionId=self.session_id).as_bytes()
-        payload = get_payload_bytes(event=EVENT_StartSession, speaker=self.speaker)
+        header = Header(
+            message_type=FULL_CLIENT_REQUEST,
+            message_type_specific_flags=MsgTypeFlagWithEvent,
+            serial_method=JSON,
+        ).as_bytes()
+        optional = Optional(
+            event=EVENT_StartSession, sessionId=self.session_id
+        ).as_bytes()
+        payload = get_payload_bytes(
+            event=EVENT_StartSession, speaker=self.speaker
+        )
         await send_event(self.ws, header, optional, payload)
         res = self.parse_server_message(await self.ws.recv())
         self._print_response(res, "start_session")
@@ -295,24 +339,36 @@ class BytedanceV3Client:
         asyncio.create_task(self.recv_loop())
 
     async def send_text(self, text: str):
-        header = Header(message_type=FULL_CLIENT_REQUEST,
-                        message_type_specific_flags=MsgTypeFlagWithEvent,
-                        serial_method=JSON).as_bytes()
-        optional = Optional(event=EVENT_TaskRequest, sessionId=self.session_id).as_bytes()
-        payload = get_payload_bytes(event=EVENT_TaskRequest, text=text, speaker=self.speaker)
+        header = Header(
+            message_type=FULL_CLIENT_REQUEST,
+            message_type_specific_flags=MsgTypeFlagWithEvent,
+            serial_method=JSON,
+        ).as_bytes()
+        optional = Optional(
+            event=EVENT_TaskRequest, sessionId=self.session_id
+        ).as_bytes()
+        payload = get_payload_bytes(
+            event=EVENT_TaskRequest, text=text, speaker=self.speaker
+        )
         await send_event(self.ws, header, optional, payload)
 
     async def finish_session(self):
-        header = Header(message_type=FULL_CLIENT_REQUEST,
-                        message_type_specific_flags=MsgTypeFlagWithEvent,
-                        serial_method=JSON).as_bytes()
-        optional = Optional(event=EVENT_FinishSession, sessionId=self.session_id).as_bytes()
+        header = Header(
+            message_type=FULL_CLIENT_REQUEST,
+            message_type_specific_flags=MsgTypeFlagWithEvent,
+            serial_method=JSON,
+        ).as_bytes()
+        optional = Optional(
+            event=EVENT_FinishSession, sessionId=self.session_id
+        ).as_bytes()
         await send_event(self.ws, header, optional, b"{}")
 
     async def finish_connection(self):
-        header = Header(message_type=FULL_CLIENT_REQUEST,
-                        message_type_specific_flags=MsgTypeFlagWithEvent,
-                        serial_method=JSON).as_bytes()
+        header = Header(
+            message_type=FULL_CLIENT_REQUEST,
+            message_type_specific_flags=MsgTypeFlagWithEvent,
+            serial_method=JSON,
+        ).as_bytes()
         optional = Optional(event=EVENT_FinishConnection).as_bytes()
         await send_event(self.ws, header, optional, b"{}")
 
@@ -331,10 +387,16 @@ class BytedanceV3Client:
                 if message.payload:
                     await self.audio_queue.put((message.event, message.payload))
                 else:
-                    self.ten_env.log_error("Received empty payload for TTS response")
+                    self.ten_env.log_error(
+                        "Received empty payload for TTS response"
+                    )
             elif message.event == EVENT_TTSSentenceEnd:
                 await self.audio_queue.put((message.event, None))
-            elif message.event in [EVENT_SessionFinished, EVENT_ConnectionFinished, EVENT_SessionFailed]:
+            elif message.event in [
+                EVENT_SessionFinished,
+                EVENT_ConnectionFinished,
+                EVENT_SessionFailed,
+            ]:
                 continue
             else:
                 continue
@@ -348,7 +410,10 @@ class BytedanceV3Client:
     def parse_server_message(self, res) -> ServerResponse:
         try:
             response = parser_response(res)
-            if response.header.message_type == FULL_SERVER_RESPONSE or response.header.message_type == AUDIO_ONLY_RESPONSE:
+            if (
+                response.header.message_type == FULL_SERVER_RESPONSE
+                or response.header.message_type == AUDIO_ONLY_RESPONSE
+            ):
                 return ServerResponse(
                     event=response.optional.event,
                     sessionId=response.optional.sessionId,
@@ -356,18 +421,22 @@ class BytedanceV3Client:
                     payload=response.payload,
                     payload_json=response.payload_json,
                     header=response.header.__dict__,
-                    optional=response.optional.__dict__
+                    optional=response.optional.__dict__,
                 )
             else:
-                raise RuntimeError(f"unknown message type: {response.header.message_type}")
+                raise RuntimeError(
+                    f"unknown message type: {response.header.message_type}"
+                )
         except json.JSONDecodeError as e:
             self.ten_env.log_error(f"Failed to parse server message: {e}")
-            raise RuntimeError(f"Failed to parse server message: {e}")
+            raise RuntimeError(f"Failed to parse server message: {e}") from e
 
     def _print_response(self, res: ServerResponse, tag: str):
         self.ten_env.log_debug(f"[{tag}] Header: {res.header}")
         self.ten_env.log_debug(f"[{tag}] Optional: {res.optional}")
-        self.ten_env.log_debug(f"[{tag}] Payload Len: {len(res.payload) if res.payload else 0}")
+        self.ten_env.log_debug(
+            f"[{tag}] Payload Len: {len(res.payload) if res.payload else 0}"
+        )
         self.ten_env.log_debug(f"[{tag}] Payload JSON: {res.payload_json}")
 
     async def close(self):
