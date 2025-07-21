@@ -4,7 +4,6 @@
 # See the LICENSE file for more information.
 #
 import traceback
-from typing import AsyncGenerator
 
 from ten_ai_base.struct import TTSTextInput
 from ten_ai_base.tts2 import AsyncTTS2BaseExtension
@@ -41,10 +40,10 @@ class ElevenLabsTTS2Extension(AsyncTTS2BaseExtension):
     def vendor(self) -> str:
         return "elevenlabs"
 
-    async def request_tts(self, t: TTSTextInput) -> AsyncGenerator[bytes, None]:
+    async def request_tts(self, t: TTSTextInput) -> None:
         audio_stream = self.client.text_to_speech_stream(t.text)
         async for audio_data in audio_stream:
-            yield audio_data
+            await self.send_tts_audio_data(audio_data)
 
     def synthesize_audio_sample_rate(self) -> int:
         return 16000

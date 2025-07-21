@@ -385,7 +385,9 @@ class BytedanceV3Client:
             self._print_response(message, "recv_loop")
             if message.event == EVENT_TTSResponse:
                 if message.payload:
-                    await self.response_msgs.put((message.event, message.payload))
+                    await self.response_msgs.put(
+                        (message.event, message.payload)
+                    )
                 else:
                     self.ten_env.log_error(
                         "Received empty payload for TTS response"

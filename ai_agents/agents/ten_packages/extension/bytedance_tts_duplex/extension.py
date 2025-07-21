@@ -5,7 +5,6 @@
 #
 import asyncio
 import traceback
-from typing import AsyncGenerator
 
 from pydantic import BaseModel
 
@@ -16,7 +15,6 @@ from .bytedance_tts import (
     BytedanceV3Client,
     EVENT_SessionFinished,
     EVENT_TTSResponse,
-    EVENT_TTSSentenceEnd,
 )
 from ten_runtime import (
     AsyncTenEnv,
@@ -150,7 +148,6 @@ class BytedanceTTSDuplexExtension(AsyncTTS2BaseExtension):
                 await self.client.finish_connection()
                 await self.client.close()
                 self.client = None
-
 
         except Exception as e:
             self.ten_env.log_error(f"Error in request_tts: {e}")
