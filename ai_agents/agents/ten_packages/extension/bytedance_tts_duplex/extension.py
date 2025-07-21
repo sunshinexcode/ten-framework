@@ -4,14 +4,18 @@
 # See the LICENSE file for more information.
 #
 import asyncio
+from datetime import datetime
+import os
 import traceback
 
 from pydantic import BaseModel
 
-from ten_ai_base.struct import TTSTextInput
+from ten_ai_base.helper import PCMWriter, generate_file_name
+from ten_ai_base.struct import TTSMetadata, TTSTextInput
 from ten_ai_base.tts2 import AsyncTTS2BaseExtension
 
 from .bytedance_tts import (
+    BytedanceTTSDuplexConfig,
     BytedanceV3Client,
     EVENT_SessionFinished,
     EVENT_TTSResponse,
@@ -21,19 +25,16 @@ from ten_runtime import (
 )
 
 
-class BytedanceTTSDuplexConfig(BaseModel):
-    appid: str
-    token: str
-    speaker: str = "zh_female_shuangkuaisisi_moon_bigtts"
-
-
 class BytedanceTTSDuplexExtension(AsyncTTS2BaseExtension):
     def __init__(self, name: str) -> None:
         super().__init__(name)
         self.config: BytedanceTTSDuplexConfig = None
         self.client: BytedanceV3Client = None
         self.current_request_id: str = None
+        self.current_turn_id: int = -1
         self.stop_event: asyncio.Event = None
+        self.recorder: PCMWriter = None
+        self.sent_ts: datetime | None = None
 
     async def on_start(self, ten_env: AsyncTenEnv) -> None:
         try:
@@ -55,12 +56,8 @@ class BytedanceTTSDuplexExtension(AsyncTTS2BaseExtension):
                     self.ten_env.log_error("get property token")
                     return ValueError("token is required")
 
-            self.client = BytedanceV3Client(
-                app_id=self.config.appid,
-                token=self.config.token,
-                speaker=self.config.speaker,
-                ten_env=ten_env,
-            )
+            self.recorder = PCMWriter(os.path.join(self.config.dump_path, generate_file_name("agent_dump")))
+            self.client = BytedanceV3Client(self.config, ten_env)
         except Exception:
             ten_env.log_error(f"on_start failed: {traceback.format_exc()}")
 
@@ -79,10 +76,19 @@ class BytedanceTTSDuplexExtension(AsyncTTS2BaseExtension):
         while True:
             try:
                 event, audio_data = await self.client.response_msgs.get()
-                self.ten_env.log_info(f"Received event: {event}")
+                self.ten_env.log_debug(f"Received event: {event}")
 
                 if event == EVENT_TTSResponse:
                     if audio_data is not None:
+                        if self.config.dump:
+                            asyncio.create_task(self.recorder.write(audio_data))
+                        if self.sent_ts is not None:
+                            elapsed_time = datetime.now() - self.sent_ts
+                            await self.send_tts_ttfb_metrics(self.current_request_id, elapsed_time, self.current_turn_id)
+                            self.sent_ts = None
+                            self.ten_env.log_info(
+                                f"Sent TTFB metrics for request ID: {self.current_request_id}, elapsed time: {elapsed_time}"
+                            )
                         await self.send_tts_audio_data(audio_data)
                     else:
                         self.ten_env.log_error(
@@ -95,14 +101,14 @@ class BytedanceTTSDuplexExtension(AsyncTTS2BaseExtension):
                     break
 
             except Exception as e:
-                self.ten_env.log_error(f"Error in _loop: {e}")
+                self.ten_env.log_error(f"Error in _loop: {traceback.format_exc()}")
                 break
 
     def vendor(self) -> str:
         return "bytedance"
 
     def synthesize_audio_sample_rate(self) -> int:
-        return 24000
+        return self.config.sample_rate
 
     async def request_tts(self, t: TTSTextInput) -> None:
         """
@@ -118,15 +124,20 @@ class BytedanceTTSDuplexExtension(AsyncTTS2BaseExtension):
                     f"New TTS request with ID: {t.request_id}"
                 )
                 self.current_request_id = t.request_id
+                self.current_metadata = t.metadata
+                if t.metadata is not None:
+                    self.session_id = t.metadata.session_id
+                    self.current_turn_id = t.metadata.turn_id
+                self.sent_ts = None
                 await self.client.finish_session()
                 await self.client.finish_connection()
                 await self.client.close()
-                self.client = BytedanceV3Client(
-                    app_id=self.config.appid,
-                    token=self.config.token,
-                    speaker=self.config.speaker,
-                    ten_env=self.ten_env,
-                )
+
+
+                if self.sent_ts is None:
+                    self.sent_ts = datetime.now()
+
+                self.client = BytedanceV3Client(self.config, self.ten_env)
                 await self.client.connect()
 
                 asyncio.create_task(self._loop())
@@ -150,7 +161,7 @@ class BytedanceTTSDuplexExtension(AsyncTTS2BaseExtension):
                 self.client = None
 
         except Exception as e:
-            self.ten_env.log_error(f"Error in request_tts: {e}")
+            self.ten_env.log_error(f"Error in request_tts: {traceback.format_exc()}")
             # yield b""
 
         # self.ten_env.log_info("TTS request completed")
