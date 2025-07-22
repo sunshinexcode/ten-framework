@@ -1,7 +1,7 @@
 import asyncio
 from dataclasses import dataclass, field
 import json
-from typing import Any, AsyncGenerator, Dict, List, Tuple
+from typing import Any, AsyncGenerator, Dict, Tuple
 import uuid
 
 import time
@@ -87,10 +87,27 @@ class BytedanceTTSDuplexConfig(BaseModel):
     dump_path: str = "/tmp"
     params: Dict[str, Any] = field(default_factory=dict)
     enable_words: bool = False
-    black_list_params: List[str] = field(default_factory=lambda: [])
 
-    def is_black_list_params(self, key: str) -> bool:
-        return key in self.black_list_params
+    def update_params(self) -> None:
+        ##### get value from params #####
+        if (
+            "audio_params" in self.params
+            and "sample_rate" in self.params["audio_params"]
+        ):
+            self.sample_rate = int(self.params["audio_params"]["sample_rate"])
+
+        if (
+            "audio_params" not in self.params
+            or "sample_rate" not in self.params["audio_params"]
+        ):
+            if "audio_params" not in self.params:
+                self.params["audio_params"] = {}
+            self.params["audio_params"]["sample_rate"] = self.sample_rate
+
+        ##### use fixed value #####
+        if "audio_params" not in self.params:
+            self.params["audio_params"] = {}
+        self.params["audio_params"]["format"] = "pcm"
 
 
 class Header:
@@ -290,27 +307,26 @@ class BytedanceV3Client:
         event=EVENT_NONE,
         text="",
         speaker="",
-        audio_format="pcm",
-        audio_sample_rate=24000,
     ):
-        return str.encode(
-            json.dumps(
-                {
-                    "user": {"uid": uid},
-                    "event": event,
-                    "namespace": "BidirectionalTTS",
-                    "req_params": {
-                        "text": text,
-                        "speaker": speaker,
-                        "audio_params": {
-                            "format": audio_format,
-                            "sample_rate": audio_sample_rate,
-                            "enable_timestamp": True,
-                        },
-                    },
-                }
-            )
-        )
+        """Generate payload bytes for the request."""
+        json_params = {
+                "user": {"uid": uid},
+                "event": event,
+                "namespace": "BidirectionalTTS",
+                "req_params": {
+                    "text": text,
+                    "speaker": speaker,
+                    "audio_params": self.config.params["audio_params"],
+                    "additions": (
+                        self.config.params["additions"]
+                        if "additions" in self.config.params
+                        else None
+                    ),
+                },
+        }
+        json_str = json.dumps(json_params)
+        self.ten_env.log_info(f"Payload JSON: {json_str}")
+        return str.encode(json_str)
 
     async def connect(self):
         url = self.config.api_url

@@ -63,6 +63,9 @@ class BytedanceTTSDuplexExtension(AsyncTTS2BaseExtension):
                     self.ten_env.log_error("get property token")
                     return ValueError("token is required")
 
+                # extract audio_params and additions from config
+                self.config.update_params()
+
             self.recorder = PCMWriter(
                 os.path.join(
                     self.config.dump_path, generate_file_name("agent_dump")
