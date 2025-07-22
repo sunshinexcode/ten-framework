@@ -18,9 +18,9 @@ from ten_ai_base.message import (
 )
 from ten_ai_base.struct import TTSTextInput
 from ten_ai_base.tts2 import AsyncTTS2BaseExtension
+from .config import BytedanceTTSDuplexConfig
 
 from .bytedance_tts import (
-    BytedanceTTSDuplexConfig,
     BytedanceV3Client,
     EVENT_SessionFinished,
     EVENT_TTSResponse,
@@ -70,6 +70,7 @@ class BytedanceTTSDuplexExtension(AsyncTTS2BaseExtension):
                 os.path.join(
                     self.config.dump_path, generate_file_name("agent_dump")
                 )
+                # based on request id
             )
             self.client = BytedanceV3Client(self.config, ten_env, self.vendor())
         except Exception as e:
@@ -77,7 +78,7 @@ class BytedanceTTSDuplexExtension(AsyncTTS2BaseExtension):
             await self.send_tts_error(
                 self.current_request_id,
                 ModuleError(
-                    message=e,
+                    message=str(e),
                     module_name=ModuleType.ASR,
                     code=ModuleErrorCode.FATAL_ERROR,
                     vendor_info=None,
@@ -165,6 +166,7 @@ class BytedanceTTSDuplexExtension(AsyncTTS2BaseExtension):
         Override this method to handle TTS requests.
         This is called when the TTS request is made.
         """
+        # TODO connect ahead of time
         try:
             if t.text.strip() == "":
                 self.ten_env.log_info("Received empty text for TTS request")

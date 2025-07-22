@@ -1,12 +1,11 @@
 import asyncio
-from dataclasses import dataclass, field
 import json
 from typing import Any, AsyncGenerator, Dict, Tuple
 import uuid
 
 import time
 import fastrand
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 import websockets
 from websockets.legacy.client import WebSocketClientProtocol
 from websockets.protocol import State
@@ -15,6 +14,7 @@ from ten_ai_base.message import (
     ModuleErrorVendorInfo,
     ModuleVendorException,
 )
+from .config import BytedanceTTSDuplexConfig
 from ten_runtime import AsyncTenEnv
 
 # https://www.volcengine.com/docs/6561/1329505#%E7%A4%BA%E4%BE%8Bsamples
@@ -73,42 +73,9 @@ EVENT_TTSSentenceEnd = 351
 
 EVENT_TTSResponse = 352
 
-
-@dataclass
-class BytedanceTTSDuplexConfig(BaseModel):
-    appid: str
-    token: str
-
-    # Refer to: https://www.volcengine.com/docs/6561/1257544.
-    voice_type: str = "zh_female_shuangkuaisisi_moon_bigtts"
-    sample_rate: int = 24000
-    api_url: str = "wss://openspeech.bytedance.com/api/v3/tts/bidirection"
-    dump: bool = False
-    dump_path: str = "/tmp"
-    params: Dict[str, Any] = field(default_factory=dict)
-    enable_words: bool = False
-
-    def update_params(self) -> None:
-        ##### get value from params #####
-        if (
-            "audio_params" in self.params
-            and "sample_rate" in self.params["audio_params"]
-        ):
-            self.sample_rate = int(self.params["audio_params"]["sample_rate"])
-
-        if (
-            "audio_params" not in self.params
-            or "sample_rate" not in self.params["audio_params"]
-        ):
-            if "audio_params" not in self.params:
-                self.params["audio_params"] = {}
-            self.params["audio_params"]["sample_rate"] = self.sample_rate
-
-        ##### use fixed value #####
-        if "audio_params" not in self.params:
-            self.params["audio_params"] = {}
-        self.params["audio_params"]["format"] = "pcm"
-
+# TODO all received
+# TODO all sent
+# TODO key points
 
 class Header:
     def __init__(
