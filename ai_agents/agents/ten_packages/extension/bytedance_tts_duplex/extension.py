@@ -10,6 +10,12 @@ import traceback
 
 
 from ten_ai_base.helper import PCMWriter, generate_file_name
+from ten_ai_base.message import (
+    ModuleError,
+    ModuleErrorCode,
+    ModuleType,
+    ModuleVendorException,
+)
 from ten_ai_base.struct import TTSTextInput
 from ten_ai_base.tts2 import AsyncTTS2BaseExtension
 
@@ -28,10 +34,12 @@ class BytedanceTTSDuplexExtension(AsyncTTS2BaseExtension):
     def __init__(self, name: str) -> None:
         super().__init__(name)
         self.config: BytedanceTTSDuplexConfig = None
+        self.stopped: bool = False
         self.client: BytedanceV3Client = None
         self.current_request_id: str = None
         self.current_turn_id: int = -1
         self.stop_event: asyncio.Event = None
+        self.msg_polling_task: asyncio.Task = None
         self.recorder: PCMWriter = None
         self.sent_ts: datetime | None = None
 
@@ -60,14 +68,24 @@ class BytedanceTTSDuplexExtension(AsyncTTS2BaseExtension):
                     self.config.dump_path, generate_file_name("agent_dump")
                 )
             )
-            self.client = BytedanceV3Client(self.config, ten_env)
-        except Exception:
+            self.client = BytedanceV3Client(self.config, ten_env, self.vendor())
+        except Exception as e:
             ten_env.log_error(f"on_start failed: {traceback.format_exc()}")
+            await self.send_tts_error(
+                self.current_request_id,
+                ModuleError(
+                    message=e,
+                    module_name=ModuleType.ASR,
+                    code=ModuleErrorCode.FATAL_ERROR,
+                    vendor_info=None,
+                ),
+            )
 
     async def on_stop(self, ten_env: AsyncTenEnv) -> None:
         if self.client:
             await self.client.close()
 
+        self.stopped = True
         await super().on_stop(ten_env)
         ten_env.log_debug("on_stop")
 
@@ -76,7 +94,7 @@ class BytedanceTTSDuplexExtension(AsyncTTS2BaseExtension):
         ten_env.log_debug("on_deinit")
 
     async def _loop(self) -> None:
-        while True:
+        while self.stopped is False:
             try:
                 event, audio_data = await self.client.response_msgs.get()
                 self.ten_env.log_debug(f"Received event: {event}")
@@ -113,6 +131,26 @@ class BytedanceTTSDuplexExtension(AsyncTTS2BaseExtension):
                 )
                 break
 
+    async def _cleanup(self) -> None:
+        try:
+            if self.msg_polling_task:
+                self.msg_polling_task.cancel()
+        except Exception:
+            self.ten_env.log_warn(
+                f"Error cancelling msg_polling_task: {traceback.format_exc()}"
+            )
+        try:
+            if self.client:
+                await self.client.finish_session()
+                await self.client.finish_connection()
+                await self.client.close()
+        except Exception:
+            self.ten_env.log_warn(
+                f"Error during cleanup: {traceback.format_exc()}"
+            )
+        self.client = None
+        self.msg_polling_task = None
+
     def vendor(self) -> str:
         return "bytedance"
 
@@ -128,7 +166,7 @@ class BytedanceTTSDuplexExtension(AsyncTTS2BaseExtension):
             if t.text.strip() == "":
                 self.ten_env.log_info("Received empty text for TTS request")
                 return
-            if t.request_id != self.current_request_id:
+            if t.request_id != self.current_request_id or self.client is None:
                 self.ten_env.log_info(
                     f"New TTS request with ID: {t.request_id}"
                 )
@@ -137,23 +175,22 @@ class BytedanceTTSDuplexExtension(AsyncTTS2BaseExtension):
                     self.session_id = t.metadata.session_id
                     self.current_turn_id = t.metadata.turn_id
                 self.sent_ts = None
-                await self.client.finish_session()
-                await self.client.finish_connection()
-                await self.client.close()
+                await self._cleanup()
 
                 if self.sent_ts is None:
                     self.sent_ts = datetime.now()
 
-                self.client = BytedanceV3Client(self.config, self.ten_env)
+                self.client = BytedanceV3Client(
+                    self.config, self.ten_env, self.vendor()
+                )
                 await self.client.connect()
-
-                asyncio.create_task(self._loop())
 
                 await self.client.start_connection()
                 await self.client.start_session()
 
-            await self.client.send_text(t.text)
+                self.msg_polling_task = asyncio.create_task(self._loop())
 
+            await self.client.send_text(t.text)
             if t.text_input_end:
                 self.ten_env.log_info(
                     f"Received TTS text input end for request ID: {t.request_id}"
@@ -166,11 +203,31 @@ class BytedanceTTSDuplexExtension(AsyncTTS2BaseExtension):
                 await self.client.finish_connection()
                 await self.client.close()
                 self.client = None
-
-        except Exception:
+        except ModuleVendorException as e:
             self.ten_env.log_error(
-                f"Error in request_tts: {traceback.format_exc()}"
+                f"ModuleVendorException in request_tts: {traceback.format_exc()}. text: {t.text}"
             )
-            # yield b""
-
-        # self.ten_env.log_info("TTS request completed")
+            await self.send_tts_error(
+                self.current_request_id,
+                ModuleError(
+                    message=str(e),
+                    module_name=ModuleType.TTS,
+                    code=ModuleErrorCode.NON_FATAL_ERROR,
+                    vendor_info=e.error,
+                ),
+            )
+            await self._cleanup()
+        except Exception as e:
+            self.ten_env.log_error(
+                f"Error in request_tts: {traceback.format_exc()}. text: {t.text}"
+            )
+            await self.send_tts_error(
+                self.current_request_id,
+                ModuleError(
+                    message=str(e),
+                    module_name=ModuleType.TTS,
+                    code=ModuleErrorCode.NON_FATAL_ERROR,
+                    vendor_info=None,
+                ),
+            )
+            await self._cleanup()

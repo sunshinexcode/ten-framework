@@ -9,7 +9,12 @@ import fastrand
 from pydantic import BaseModel
 import websockets
 from websockets.legacy.client import WebSocketClientProtocol
+from websockets.protocol import State
 
+from ten_ai_base.message import (
+    ModuleErrorVendorInfo,
+    ModuleVendorException,
+)
 from ten_runtime import AsyncTenEnv
 
 # https://www.volcengine.com/docs/6561/1329505#%E7%A4%BA%E4%BE%8Bsamples
@@ -67,6 +72,7 @@ EVENT_TTSSentenceStart = 350
 EVENT_TTSSentenceEnd = 351
 
 EVENT_TTSResponse = 352
+
 
 @dataclass
 class BytedanceTTSDuplexConfig(BaseModel):
@@ -246,7 +252,12 @@ def read_res_payload(res: bytes, offset: int):
 
 
 class BytedanceV3Client:
-    def __init__(self, config: BytedanceTTSDuplexConfig, ten_env: AsyncTenEnv):
+    def __init__(
+        self,
+        config: BytedanceTTSDuplexConfig,
+        ten_env: AsyncTenEnv,
+        vendor: str,
+    ):
         self.config = config
         self.app_id = config.appid
         self.token = config.token
@@ -255,6 +266,7 @@ class BytedanceV3Client:
         self.ws: WebSocketClientProtocol = None
         self.stop_event = asyncio.Event()
         self.ten_env: AsyncTenEnv = ten_env
+        self.vendor = vendor
         self.response_msgs = asyncio.Queue[Tuple[int, bytes]]()
 
     def gen_log_id(self) -> str:
@@ -318,7 +330,7 @@ class BytedanceV3Client:
         optional: bytes | None = None,
         payload: bytes = None,
     ):
-        if self.ws is not None:
+        if self.ws is not None and self.ws.state == State.OPEN:
             full_client_request = bytearray(header)
             if optional is not None:
                 full_client_request.extend(optional)
@@ -340,7 +352,13 @@ class BytedanceV3Client:
         res = self.parse_server_message(await self.ws.recv())
         self._print_response(res, "start_connection")
         if res.event != EVENT_ConnectionStarted:
-            raise RuntimeError("Start connection failed")
+            raise ModuleVendorException(
+                ModuleErrorVendorInfo(
+                    vendor=self.vendor,
+                    code=str(res.event),
+                    message=f"Start connection failed with event: {res.event}",
+                )
+            )
 
     async def start_session(self):
         header = Header(
@@ -358,7 +376,13 @@ class BytedanceV3Client:
         res = self.parse_server_message(await self.ws.recv())
         self._print_response(res, "start_session")
         if res.event != EVENT_SessionStarted:
-            raise RuntimeError("Start session failed")
+            raise ModuleVendorException(
+                ModuleErrorVendorInfo(
+                    vendor=self.vendor,
+                    code=str(res.event),
+                    message=f"Start session failed with event: {res.event}",
+                )
+            )
 
         asyncio.create_task(self.recv_loop())
 
