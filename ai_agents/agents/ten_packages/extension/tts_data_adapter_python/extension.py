@@ -60,9 +60,9 @@ class TTSDataAdapterExtension(AsyncExtension):
 
             json_data = json.loads(json_str)
             text = json_data.get("text", "")
-            final = json_data.get("final", False)
+            final = json_data.get("end_of_segment", False)
 
-            ten_env.log_info(f"Received LLM result: {json_str}")
+            ten_env.log_info(f"Received LLM result: {text}, final: {final}")
 
             output = Data.create("tts_text_input")
             output.set_property_string("request_id", self.request_id)

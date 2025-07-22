@@ -1,11 +1,11 @@
 import asyncio
 import json
-from typing import Any, AsyncGenerator, Dict, Tuple
+from typing import AsyncGenerator, Tuple
 import uuid
 
 import time
 import fastrand
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 import websockets
 from websockets.legacy.client import WebSocketClientProtocol
 from websockets.protocol import State
@@ -76,6 +76,7 @@ EVENT_TTSResponse = 352
 # TODO all received
 # TODO all sent
 # TODO key points
+
 
 class Header:
     def __init__(
@@ -241,6 +242,7 @@ class BytedanceV3Client:
         config: BytedanceTTSDuplexConfig,
         ten_env: AsyncTenEnv,
         vendor: str,
+        response_msgs: asyncio.Queue[Tuple[int, bytes]],
     ):
         self.config = config
         self.app_id = config.appid
@@ -251,7 +253,9 @@ class BytedanceV3Client:
         self.stop_event = asyncio.Event()
         self.ten_env: AsyncTenEnv = ten_env
         self.vendor = vendor
-        self.response_msgs = asyncio.Queue[Tuple[int, bytes]]()
+        self.response_msgs: asyncio.Queue[Tuple[int, bytes]] | None = (
+            response_msgs
+        )
 
     def gen_log_id(self) -> str:
         ts = int(time.time() * 1000)
@@ -277,19 +281,19 @@ class BytedanceV3Client:
     ):
         """Generate payload bytes for the request."""
         json_params = {
-                "user": {"uid": uid},
-                "event": event,
-                "namespace": "BidirectionalTTS",
-                "req_params": {
-                    "text": text,
-                    "speaker": speaker,
-                    "audio_params": self.config.params["audio_params"],
-                    "additions": (
-                        self.config.params["additions"]
-                        if "additions" in self.config.params
-                        else None
-                    ),
-                },
+            "user": {"uid": uid},
+            "event": event,
+            "namespace": "BidirectionalTTS",
+            "req_params": {
+                "text": text,
+                "speaker": speaker,
+                "audio_params": self.config.params["audio_params"],
+                "additions": (
+                    self.config.params["additions"]
+                    if "additions" in self.config.params
+                    else None
+                ),
+            },
         }
         json_str = json.dumps(json_params)
         self.ten_env.log_info(f"Payload JSON: {json_str}")
@@ -313,15 +317,20 @@ class BytedanceV3Client:
         optional: bytes | None = None,
         payload: bytes = None,
     ):
-        if self.ws is not None and self.ws.state == State.OPEN:
-            full_client_request = bytearray(header)
-            if optional is not None:
-                full_client_request.extend(optional)
-            if payload is not None:
-                payload_size = len(payload).to_bytes(4, "big", signed=False)
-                full_client_request.extend(payload_size)
-                full_client_request.extend(payload)
-            await self.ws.send(bytes(full_client_request))
+        if self.ws is not None:
+            if self.ws.state != State.OPEN:
+                self.ten_env.log_warn(
+                    "WebSocket is not open, cannot send event"
+                )
+            else:
+                full_client_request = bytearray(header)
+                if optional is not None:
+                    full_client_request.extend(optional)
+                if payload is not None:
+                    payload_size = len(payload).to_bytes(4, "big", signed=False)
+                    full_client_request.extend(payload_size)
+                    full_client_request.extend(payload)
+                await self.ws.send(bytes(full_client_request))
 
     async def start_connection(self):
         header = Header(
@@ -414,8 +423,12 @@ class BytedanceV3Client:
     async def recv_loop(self):
         async for message in self.listen():
             self._print_response(message, "recv_loop")
+            if message.event != EVENT_TTSResponse:
+                self.ten_env.log_info(
+                    f"KEYPOINT Received message: {message.event}"
+                )
             if message.event == EVENT_TTSResponse:
-                if message.payload:
+                if message.payload and self.response_msgs is not None:
                     await self.response_msgs.put(
                         (message.event, message.payload)
                     )
@@ -424,9 +437,12 @@ class BytedanceV3Client:
                         "Received empty payload for TTS response"
                     )
             elif message.event == EVENT_TTSSentenceEnd:
-                await self.response_msgs.put((message.event, None))
+                if self.response_msgs is not None:
+                    await self.response_msgs.put((message.event, None))
+            elif message.event == EVENT_SessionFinished:
+                if self.response_msgs is not None:
+                    await self.response_msgs.put((message.event, None))
             elif message.event in [
-                EVENT_SessionFinished,
                 EVENT_ConnectionFinished,
                 EVENT_SessionFailed,
             ]:
@@ -456,6 +472,14 @@ class BytedanceV3Client:
                     header=response.header.__dict__,
                     optional=response.optional.__dict__,
                 )
+            elif response.header.message_type == ERROR_INFORMATION:
+                raise ModuleVendorException(
+                    ModuleErrorVendorInfo(
+                        vendor=self.vendor,
+                        code=response.optional.event,
+                        message=response.payload_json or "Unknown error",
+                    )
+                )
             else:
                 raise RuntimeError(
                     f"unknown message type: {response.header.message_type}"
@@ -477,3 +501,4 @@ class BytedanceV3Client:
         if self.ws:
             await self.ws.close()
             self.ws = None
+        self.response_msgs = None
