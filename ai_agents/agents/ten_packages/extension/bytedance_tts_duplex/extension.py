@@ -8,10 +8,9 @@ from datetime import datetime
 import os
 import traceback
 
-from pydantic import BaseModel
 
 from ten_ai_base.helper import PCMWriter, generate_file_name
-from ten_ai_base.struct import TTSMetadata, TTSTextInput
+from ten_ai_base.struct import TTSTextInput
 from ten_ai_base.tts2 import AsyncTTS2BaseExtension
 
 from .bytedance_tts import (
@@ -56,7 +55,11 @@ class BytedanceTTSDuplexExtension(AsyncTTS2BaseExtension):
                     self.ten_env.log_error("get property token")
                     return ValueError("token is required")
 
-            self.recorder = PCMWriter(os.path.join(self.config.dump_path, generate_file_name("agent_dump")))
+            self.recorder = PCMWriter(
+                os.path.join(
+                    self.config.dump_path, generate_file_name("agent_dump")
+                )
+            )
             self.client = BytedanceV3Client(self.config, ten_env)
         except Exception:
             ten_env.log_error(f"on_start failed: {traceback.format_exc()}")
@@ -84,7 +87,11 @@ class BytedanceTTSDuplexExtension(AsyncTTS2BaseExtension):
                             asyncio.create_task(self.recorder.write(audio_data))
                         if self.sent_ts is not None:
                             elapsed_time = datetime.now() - self.sent_ts
-                            await self.send_tts_ttfb_metrics(self.current_request_id, elapsed_time, self.current_turn_id)
+                            await self.send_tts_ttfb_metrics(
+                                self.current_request_id,
+                                elapsed_time,
+                                self.current_turn_id,
+                            )
                             self.sent_ts = None
                             self.ten_env.log_info(
                                 f"Sent TTFB metrics for request ID: {self.current_request_id}, elapsed time: {elapsed_time}"
@@ -100,8 +107,10 @@ class BytedanceTTSDuplexExtension(AsyncTTS2BaseExtension):
                         self.stop_event = None
                     break
 
-            except Exception as e:
-                self.ten_env.log_error(f"Error in _loop: {traceback.format_exc()}")
+            except Exception:
+                self.ten_env.log_error(
+                    f"Error in _loop: {traceback.format_exc()}"
+                )
                 break
 
     def vendor(self) -> str:
@@ -124,7 +133,6 @@ class BytedanceTTSDuplexExtension(AsyncTTS2BaseExtension):
                     f"New TTS request with ID: {t.request_id}"
                 )
                 self.current_request_id = t.request_id
-                self.current_metadata = t.metadata
                 if t.metadata is not None:
                     self.session_id = t.metadata.session_id
                     self.current_turn_id = t.metadata.turn_id
@@ -132,7 +140,6 @@ class BytedanceTTSDuplexExtension(AsyncTTS2BaseExtension):
                 await self.client.finish_session()
                 await self.client.finish_connection()
                 await self.client.close()
-
 
                 if self.sent_ts is None:
                     self.sent_ts = datetime.now()
@@ -160,8 +167,10 @@ class BytedanceTTSDuplexExtension(AsyncTTS2BaseExtension):
                 await self.client.close()
                 self.client = None
 
-        except Exception as e:
-            self.ten_env.log_error(f"Error in request_tts: {traceback.format_exc()}")
+        except Exception:
+            self.ten_env.log_error(
+                f"Error in request_tts: {traceback.format_exc()}"
+            )
             # yield b""
 
         # self.ten_env.log_info("TTS request completed")

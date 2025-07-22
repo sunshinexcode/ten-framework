@@ -1,5 +1,5 @@
 import asyncio
-from dataclasses import field
+from dataclasses import dataclass, field
 import json
 from typing import Any, AsyncGenerator, Dict, List, Tuple
 import uuid
@@ -68,7 +68,7 @@ EVENT_TTSSentenceEnd = 351
 
 EVENT_TTSResponse = 352
 
-
+@dataclass
 class BytedanceTTSDuplexConfig(BaseModel):
     appid: str
     token: str
@@ -81,10 +81,8 @@ class BytedanceTTSDuplexConfig(BaseModel):
     dump_path: str = "/tmp"
     params: Dict[str, Any] = field(default_factory=dict)
     enable_words: bool = False
-    black_list_params: List[str] = field(
-        default_factory=lambda: [
-        ]
-    )
+    black_list_params: List[str] = field(default_factory=lambda: [])
+
     def is_black_list_params(self, key: str) -> bool:
         return key in self.black_list_params
 
@@ -229,7 +227,6 @@ def parser_response(res) -> Response:
     return response
 
 
-
 def read_res_content(res: bytes, offset: int):
     """read content from response bytes"""
     content_size = int.from_bytes(res[offset : offset + 4], "big", signed=False)
@@ -249,9 +246,7 @@ def read_res_payload(res: bytes, offset: int):
 
 
 class BytedanceV3Client:
-    def __init__(
-        self, config: BytedanceTTSDuplexConfig, ten_env: AsyncTenEnv
-    ):
+    def __init__(self, config: BytedanceTTSDuplexConfig, ten_env: AsyncTenEnv):
         self.config = config
         self.app_id = config.appid
         self.token = config.token
@@ -276,7 +271,6 @@ class BytedanceV3Client:
             "X-Api-Connect-Id": str(uuid.uuid4()),
             "X-Tt-Logid": self.gen_log_id(),
         }
-
 
     def get_payload_bytes(
         self,
@@ -306,14 +300,17 @@ class BytedanceV3Client:
             )
         )
 
-
     async def connect(self):
         url = self.config.api_url
-        self.ten_env.log_debug(f"Connecting to {url} with headers: {json.dumps(self.get_headers(), indent=2)}")
-        self.ws = await websockets.connect(
-            url, additional_headers=self.get_headers(), max_size=100_000_000, compression=None
+        self.ten_env.log_debug(
+            f"Connecting to {url} with headers: {json.dumps(self.get_headers(), indent=2)}"
         )
-
+        self.ws = await websockets.connect(
+            url,
+            additional_headers=self.get_headers(),
+            max_size=100_000_000,
+            compression=None,
+        )
 
     async def send_event(
         self,
