@@ -425,7 +425,7 @@ class BytedanceV3Client:
             self._print_response(message, "recv_loop")
             if message.event != EVENT_TTSResponse:
                 self.ten_env.log_info(
-                    f"KEYPOINT Received message: {message.event}"
+                    f"KEYPOINT Received message: {message}"
                 )
             if message.event == EVENT_TTSResponse:
                 if message.payload and self.response_msgs is not None:

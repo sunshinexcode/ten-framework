@@ -103,7 +103,6 @@ class BytedanceTTSDuplexExtension(AsyncTTS2BaseExtension):
         while True:
             try:
                 event, audio_data = await self.client.response_msgs.get()
-                self.ten_env.log_debug(f"Received event: {event}")
 
                 if event == EVENT_TTSResponse:
                     if audio_data is not None:
@@ -121,7 +120,7 @@ class BytedanceTTSDuplexExtension(AsyncTTS2BaseExtension):
                             )
                             self.sent_ts = None
                             self.ten_env.log_info(
-                                f"Sent TTFB metrics for request ID: {self.current_request_id}, elapsed time: {elapsed_time}ms"
+                                f"KEYPOINT Sent TTFB metrics for request ID: {self.current_request_id}, elapsed time: {elapsed_time}ms"
                             )
                         await self.send_tts_audio_data(audio_data)
                     else:
@@ -130,7 +129,7 @@ class BytedanceTTSDuplexExtension(AsyncTTS2BaseExtension):
                         )
                 elif event == EVENT_SessionFinished:
                     self.ten_env.log_info(
-                        f"Session finished for request ID: {self.current_request_id}"
+                        f"KEYPOINT Session finished for request ID: {self.current_request_id}"
                     )
                     if self.stop_event:
                         self.stop_event.set()
@@ -150,7 +149,7 @@ class BytedanceTTSDuplexExtension(AsyncTTS2BaseExtension):
             self.client = BytedanceV3Client(
                 self.config, self.ten_env, self.vendor(), self.response_msgs
             )
-            self.ten_env.log_info("KEYPOINT Connecting to service")
+            self.ten_env.log_info(F"KEYPOINT Connecting to service for request ID: {self.current_request_id}")
             await self.client.connect()
             await self.client.start_connection()
             await self.client.start_session()
@@ -195,7 +194,7 @@ class BytedanceTTSDuplexExtension(AsyncTTS2BaseExtension):
             )
             if t.request_id != self.current_request_id:
                 self.ten_env.log_info(
-                    f"New TTS request with ID: {t.request_id}"
+                    f"KEYPOINT New TTS request with ID: {t.request_id}"
                 )
                 self.current_request_id = t.request_id
                 if t.metadata is not None:
