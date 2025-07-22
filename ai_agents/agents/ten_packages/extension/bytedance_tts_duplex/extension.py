@@ -54,7 +54,7 @@ class BytedanceTTSDuplexExtension(AsyncTTS2BaseExtension):
                 self.config = BytedanceTTSDuplexConfig.model_validate_json(
                     config_json
                 )
-                self.ten_env.log_debug(f"config: {self.config}")
+                self.ten_env.log_info(f"KEYPOINT config: {self.config.to_str()}")
 
                 if not self.config.appid:
                     self.ten_env.log_error("get property appid")

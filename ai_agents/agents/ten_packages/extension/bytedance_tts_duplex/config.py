@@ -3,6 +3,28 @@ from typing import Any, Dict
 from pydantic import BaseModel, Field
 
 
+def mask_sensitive_data(s: str, unmasked_start: int = 3, unmasked_end: int = 3, mask_char: str = "*") -> str:
+    """
+    Mask a sensitive string by replacing the middle part with asterisks.
+
+    Parameters:
+        s (str): The input string (e.g., API key).
+        unmasked_start (int): Number of visible characters at the beginning.
+        unmasked_end (int): Number of visible characters at the end.
+        mask_char (str): Character used for masking.
+
+    Returns:
+        str: Masked string, e.g., "abc****xyz"
+    """
+    if not s or len(s) <= unmasked_start + unmasked_end:
+        return mask_char * len(s)
+
+    return (
+        s[:unmasked_start] +
+        mask_char * (len(s) - unmasked_start - unmasked_end) +
+        s[-unmasked_end:]
+    )
+
 class BytedanceTTSDuplexConfig(BaseModel):
     appid: str
     token: str
@@ -36,3 +58,19 @@ class BytedanceTTSDuplexConfig(BaseModel):
         if "audio_params" not in self.params:
             self.params["audio_params"] = {}
         self.params["audio_params"]["format"] = "pcm"
+
+    def to_str(self) -> str:
+        """
+        Convert the configuration to a string representation, masking sensitive data.
+        """
+        return (
+            f"BytedanceTTSDuplexConfig(appid={self.appid}, "
+            f"token={mask_sensitive_data(self.token)}, "
+            f"voice_type={self.voice_type}, "
+            f"sample_rate={self.sample_rate}, "
+            f"api_url={self.api_url}, "
+            f"dump={self.dump}, "
+            f"dump_path={self.dump_path}, "
+            f"params={self.params}, "
+            f"enable_words={self.enable_words})"
+        )
