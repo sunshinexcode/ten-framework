@@ -176,7 +176,7 @@ void ten_extension_tester_set_test_mode_single(ten_extension_tester_t *self,
     ten_error_t err;
     TEN_ERROR_INIT(err);
 
-    ten_json_t *json = ten_json_from_commented_string(property_json_str, &err);
+    ten_json_t *json = ten_json_from_string(property_json_str, &err);
     if (json) {
       ten_json_destroy(json);
     } else {
