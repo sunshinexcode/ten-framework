@@ -18,6 +18,7 @@ group("cpp") {
     "interface_schema_check",
     "large_result",
     "long_running",
+    "manifest_with_comments",
     "restful",
   ]
 

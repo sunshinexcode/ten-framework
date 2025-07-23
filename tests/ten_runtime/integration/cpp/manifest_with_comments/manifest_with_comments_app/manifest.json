@@ -1,0 +1,35 @@
+{
+  "type": "app",
+  "name": "default_app_cpp",
+  "version": "0.10.25",
+  "dependencies": [
+    {
+      "type": "system",
+      "name": "ten_runtime",
+      "version": "0.10.25"
+    },
+    {
+      /*
+       * This is a comment
+       */
+      "type": "extension",
+      "name": "default_extension_cpp",
+      "version": "0.10.25"
+    },
+    {
+      "type": "protocol",
+      "name": "msgpack",
+      "version": "0.10.25"
+    }
+  ],
+  "api": {
+    "property": {
+      "properties": {
+        "hello": {
+          // hello field is a string
+          "type": "string"
+        }
+      }
+    }
+  }
+}
