@@ -41,7 +41,9 @@ class BytedanceTTSDuplexExtension(AsyncTTS2BaseExtension):
         self.stop_event: asyncio.Event = None
         self.msg_polling_task: asyncio.Task = None
         self.recorder: PCMWriter = None
-        self.sent_ts: datetime | None = None
+        self.request_start_ts: datetime | None = None
+        self.request_ttfb: int | None = None
+        self.request_total_audio_duration: int | None = None
         self.response_msgs = asyncio.Queue[Tuple[int, bytes]]()
 
     async def on_init(self, ten_env: AsyncTenEnv) -> None:
@@ -108,9 +110,11 @@ class BytedanceTTSDuplexExtension(AsyncTTS2BaseExtension):
                     if audio_data is not None:
                         if self.config.dump:
                             asyncio.create_task(self.recorder.write(audio_data))
-                        if self.sent_ts is not None:
+                        if self.request_start_ts is not None and self.request_ttfb is None:
+                            await self.send_tts_audio_start(
+                                self.current_request_id)
                             elapsed_time = int(
-                                (datetime.now() - self.sent_ts).total_seconds()
+                                (datetime.now() - self.request_start_ts).total_seconds()
                                 * 1000
                             )
                             await self.send_tts_ttfb_metrics(
@@ -118,10 +122,16 @@ class BytedanceTTSDuplexExtension(AsyncTTS2BaseExtension):
                                 elapsed_time,
                                 self.current_turn_id,
                             )
-                            self.sent_ts = None
+                            self.request_ttfb = elapsed_time
                             self.ten_env.log_info(
                                 f"KEYPOINT Sent TTFB metrics for request ID: {self.current_request_id}, elapsed time: {elapsed_time}ms"
                             )
+                        self.request_total_audio_duration += self.calculate_audio_duration(
+                            len(audio_data),
+                            self.synthesize_audio_sample_rate(),
+                            self.synthesize_audio_channels(),
+                            self.synthesize_audio_sample_width(),
+                        )
                         await self.send_tts_audio_data(audio_data)
                     else:
                         self.ten_env.log_error(
@@ -131,6 +141,16 @@ class BytedanceTTSDuplexExtension(AsyncTTS2BaseExtension):
                     self.ten_env.log_info(
                         f"KEYPOINT Session finished for request ID: {self.current_request_id}"
                     )
+                    if self.request_start_ts is not None:
+                        request_event_interval = int(
+                            (datetime.now() - self.request_start_ts).total_seconds()
+                            * 1000
+                        )
+                        await self.send_tts_audio_end(self.current_request_id, request_event_interval, self.request_total_audio_duration, self.current_turn_id)
+
+                        self.ten_env.log_info(
+                            f"KEYPOINT request time stamped for request ID: {self.current_request_id}, request_event_interval: {request_event_interval}ms, total_audio_duration: {self.request_total_audio_duration}ms"
+                        )
                     if self.stop_event:
                         self.stop_event.set()
                         self.stop_event = None
@@ -198,10 +218,11 @@ class BytedanceTTSDuplexExtension(AsyncTTS2BaseExtension):
                 )
                 self.current_request_id = t.request_id
                 if t.metadata is not None:
-                    self.session_id = t.metadata.session_id
-                    self.current_turn_id = t.metadata.turn_id
-                if self.sent_ts is None:
-                    self.sent_ts = datetime.now()
+                    self.session_id = t.metadata.get("session_id", "")
+                    self.current_turn_id = t.metadata.get("turn_id", -1)
+                self.request_start_ts = datetime.now()
+                self.request_ttfb = None
+                self.request_total_audio_duration = 0
 
             if t.text.strip() != "":
                 await self.client.send_text(t.text)
@@ -249,3 +270,27 @@ class BytedanceTTSDuplexExtension(AsyncTTS2BaseExtension):
                 ),
             )
             await self._reconnect()
+
+
+    def calculate_audio_duration(
+        self,
+        bytes_length: int,
+        sample_rate: int,
+        channels: int = 1,
+        sample_width: int = 2,
+    ) -> int:
+        """
+        Calculate audio duration in milliseconds.
+
+        Parameters:
+        - bytes_length: Length of the audio data in bytes
+        - sample_rate: Sample rate in Hz (e.g., 16000)
+        - channels: Number of audio channels (default: 1 for mono)
+        - sample_width: Number of bytes per sample (default: 2 for 16-bit PCM)
+
+        Returns:
+        - Duration in milliseconds (rounded down to nearest int)
+        """
+        bytes_per_second = sample_rate * channels * sample_width
+        duration_seconds = bytes_length / bytes_per_second
+        return int(duration_seconds * 1000)
