@@ -136,6 +136,9 @@ TEN_UTILS_API const char *ten_json_to_string(ten_json_t *self, const char *key,
 TEN_UTILS_API ten_json_t *ten_json_from_string(const char *value,
                                                ten_error_t *err);
 
+TEN_UTILS_API ten_json_t *ten_json_from_commented_string(const char *value,
+                                                         ten_error_t *err);
+
 TEN_UTILS_API bool ten_json_is_object(ten_json_t *self);
 
 TEN_UTILS_API bool ten_json_is_array(ten_json_t *self);

@@ -138,9 +138,6 @@ TEN_RUST_PRIVATE_API bool ten_cipher_encrypt_inplace(Cipher *cipher_ptr,
                                                      uint8_t *data,
                                                      uintptr_t data_len);
 
-TEN_RUST_PRIVATE_API char *ten_remove_json_comments(
-    const char *json_with_comments);
-
 TEN_RUST_PRIVATE_API bool ten_validate_manifest_json_string(
     const char *manifest_data, const char **out_err_msg);
 

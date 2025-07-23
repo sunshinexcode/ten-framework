@@ -35,7 +35,8 @@ ten_string_t *ten_find_base_dir(const char *start_path, const char *addon_type,
       const char *manifest_content =
           ten_file_read(ten_string_get_raw_str(manifest_path));
       if (manifest_content) {
-        ten_json_t *json = ten_json_from_string(manifest_content, NULL);
+        ten_json_t *json =
+            ten_json_from_commented_string(manifest_content, NULL);
         if (json) {
           do {
             const char *type_in_manifest =

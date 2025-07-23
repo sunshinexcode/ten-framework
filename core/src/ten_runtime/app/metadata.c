@@ -15,7 +15,6 @@
 #include "include_internal/ten_runtime/common/log.h"
 #include "include_internal/ten_runtime/extension/extension_info/extension_info.h"
 #include "include_internal/ten_runtime/global/log.h"
-#include "include_internal/ten_runtime/metadata/manifest.h"
 #include "include_internal/ten_utils/log/log.h"
 #include "include_internal/ten_utils/log/output.h"
 #include "ten_runtime/app/app.h"

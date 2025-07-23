@@ -15,7 +15,6 @@
 #include "include_internal/ten_runtime/binding/python/common.h"
 #include "include_internal/ten_runtime/common/base_dir.h"
 #include "include_internal/ten_runtime/common/constant_str.h"
-#include "include_internal/ten_runtime/metadata/manifest.h"
 #include "ten_runtime/addon/addon.h"
 #include "ten_utils/container/list_str.h"
 #include "ten_utils/lib/module.h"

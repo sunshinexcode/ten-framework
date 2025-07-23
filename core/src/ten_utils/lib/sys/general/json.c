@@ -547,7 +547,9 @@ const char *ten_json_to_string(ten_json_t *self, const char *key,
   return NULL;
 }
 
-ten_json_t *ten_json_from_string(const char *value, ten_error_t *err) {
+static ten_json_t *ten_json_from_string_internal(const char *value,
+                                                 yyjson_read_flag flag,
+                                                 ten_error_t *err) {
   TEN_ASSERT(value, "Invalid argument.");
   if (!value || !*value) {
     return NULL;
@@ -557,7 +559,7 @@ ten_json_t *ten_json_from_string(const char *value, ten_error_t *err) {
   yyjson_doc *doc = NULL;
   yyjson_mut_doc *mut_doc = NULL;
 
-  doc = yyjson_read(value, strlen(value), 0);
+  doc = yyjson_read(value, strlen(value), flag);
   if (!doc) {
     goto error;
   }
@@ -598,6 +600,15 @@ done:
     yyjson_doc_free(doc);
   }
   return result;
+}
+
+ten_json_t *ten_json_from_string(const char *value, ten_error_t *err) {
+  return ten_json_from_string_internal(value, 0, err);
+}
+
+ten_json_t *ten_json_from_commented_string(const char *value,
+                                           ten_error_t *err) {
+  return ten_json_from_string_internal(value, YYJSON_READ_ALLOW_COMMENTS, err);
 }
 
 bool ten_json_is_object(ten_json_t *self) {

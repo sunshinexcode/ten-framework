@@ -536,7 +536,7 @@ ten_schema_t *ten_schema_create_from_json_str(const char *json_string,
   ten_error_t err;
   TEN_ERROR_INIT(err);
 
-  ten_json_t *schema_json = ten_json_from_string(json_string, &err);
+  ten_json_t *schema_json = ten_json_from_commented_string(json_string, &err);
   do {
     if (!schema_json) {
       break;
@@ -586,7 +586,7 @@ bool ten_schema_adjust_and_validate_json_str(ten_schema_t *self,
   TEN_ERROR_INIT(err);
 
   // Parse the JSON string into a ten_json_t structure.
-  ten_json_t *json = ten_json_from_string(json_string, &err);
+  ten_json_t *json = ten_json_from_commented_string(json_string, &err);
 
   ten_value_t *value = NULL;
   do {

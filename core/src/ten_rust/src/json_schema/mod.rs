@@ -100,7 +100,7 @@ fn validate_json_object_with_shared_definitions(
 }
 
 pub fn ten_validate_manifest_json_string(data: &str) -> Result<()> {
-    let manifest_json: serde_json::Value = serde_json::from_str(data)?;
+    let manifest_json: serde_json::Value = json5::from_str(data)?;
     validate_json_object_with_shared_definitions(
         &manifest_json,
         definition::MANIFEST_SCHEMA_DEFINITION,
@@ -156,7 +156,7 @@ pub fn ten_validate_property_json_file<P: AsRef<Path>>(
 }
 
 pub fn ten_validate_interface_json_string(data: &str) -> Result<()> {
-    let interface_json: serde_json::Value = serde_json::from_str(data)?;
+    let interface_json: serde_json::Value = json5::from_str(data)?;
     validate_json_object_with_shared_definitions(
         &interface_json,
         definition::INTERFACE_SCHEMA_DEFINITION,

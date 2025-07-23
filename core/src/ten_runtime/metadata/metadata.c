@@ -25,10 +25,11 @@
 static bool ten_metadata_load_from_json_str(ten_value_t *metadata,
                                             const char *json_str,
                                             ten_error_t *err) {
-  TEN_ASSERT(metadata && ten_value_check_integrity(metadata) && json_str,
-             "Should not happen.");
+  TEN_ASSERT(metadata, "Should not happen.");
+  TEN_ASSERT(ten_value_check_integrity(metadata), "Should not happen.");
+  TEN_ASSERT(json_str, "Should not happen.");
 
-  ten_json_t *json = ten_json_from_string(json_str, err);
+  ten_json_t *json = ten_json_from_commented_string(json_str, err);
   if (!json) {
     return false;
   }
@@ -43,8 +44,8 @@ static bool ten_metadata_load_from_json_str(ten_value_t *metadata,
 static bool ten_metadata_load_from_json_file(ten_value_t *metadata,
                                              const char *filename,
                                              ten_error_t *err) {
-  TEN_ASSERT(metadata && ten_value_check_integrity(metadata),
-             "Should not happen.");
+  TEN_ASSERT(metadata, "Should not happen.");
+  TEN_ASSERT(ten_value_check_integrity(metadata), "Should not happen.");
 
   if (!filename || strlen(filename) == 0) {
     TEN_LOGW("Try to load metadata but file name not provided");

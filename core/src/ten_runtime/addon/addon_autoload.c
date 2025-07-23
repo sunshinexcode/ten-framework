@@ -27,7 +27,6 @@
 #include "include_internal/ten_runtime/addon/addon.h"
 #include "include_internal/ten_runtime/addon/addon_manager.h"
 #include "include_internal/ten_runtime/addon_loader/addon_loader.h"
-#include "include_internal/ten_runtime/metadata/manifest.h"
 #include "include_internal/ten_utils/log/log.h"
 #include "ten_runtime/addon/addon.h"
 #include "ten_runtime/common/error_code.h"
