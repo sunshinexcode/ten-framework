@@ -282,7 +282,7 @@ ten_value_t *ten_value_from_json_str(const char *json_str) {
     return NULL;
   }
 
-  ten_json_t *json = ten_json_from_commented_string(json_str, NULL);
+  ten_json_t *json = ten_json_from_string(json_str, NULL);
   if (!json) {
     TEN_LOGE("Failed to parse JSON string: %s", json_str);
     return NULL;
