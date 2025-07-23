@@ -88,8 +88,8 @@ pub async fn execute_cmd(
         read_file_to_string(&manifest_path).map_err(|e| {
             anyhow!("Failed to read {}: {}", MANIFEST_JSON_FILENAME, e)
         })?;
-    let manifest_value: serde_json::Value =
-        serde_json::from_str(&manifest_json_str).map_err(|e| {
+    let manifest_value: serde_json::Value = json5::from_str(&manifest_json_str)
+        .map_err(|e| {
             anyhow!("Failed to parse {}: {}", MANIFEST_JSON_FILENAME, e)
         })?;
 

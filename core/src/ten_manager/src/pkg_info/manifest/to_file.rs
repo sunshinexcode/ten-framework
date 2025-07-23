@@ -22,7 +22,7 @@ pub fn load_from_file<T: DeserializeOwned>(file_path: &Path) -> Result<T> {
     let mut contents = String::new();
     file.read_to_string(&mut contents)?;
 
-    let result = serde_json::from_str(&contents)?;
+    let result = json5::from_str(&contents)?;
     Ok(result)
 }
 

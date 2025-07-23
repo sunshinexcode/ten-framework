@@ -247,7 +247,7 @@ impl Manifest {
     pub fn create_from_str(s: &str) -> Result<Self> {
         ten_validate_manifest_json_string(s)?;
 
-        let value: serde_json::Value = serde_json::from_str(s)?;
+        let value: serde_json::Value = json5::from_str(s)?;
         let all_fields = match value {
             Value::Object(map) => map,
             _ => return Err(anyhow!("Expected JSON object")),

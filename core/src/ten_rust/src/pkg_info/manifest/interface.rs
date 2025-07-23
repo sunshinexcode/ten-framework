@@ -57,8 +57,8 @@ async fn load_interface(
         .with_context(|| format!("Invalid interface file: {real_path}"))?;
 
     // Parse the interface file into a ManifestApi structure.
-    let mut interface_api: ManifestApi =
-        serde_json::from_str(&interface_content).with_context(|| {
+    let mut interface_api: ManifestApi = json5::from_str(&interface_content)
+        .with_context(|| {
             format!("Failed to parse interface file from {real_path}")
         })?;
 

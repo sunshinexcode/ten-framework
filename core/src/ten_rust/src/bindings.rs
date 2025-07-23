@@ -271,7 +271,7 @@ pub unsafe extern "C" fn ten_rust_manifest_api_flatten(
 
     // Parse the JSON string into a ManifestApi
     let mut manifest_api: ManifestApi =
-        match serde_json::from_str(manifest_api_json_str_rust_str) {
+        match json5::from_str(manifest_api_json_str_rust_str) {
             Ok(m) => m,
             Err(e) => {
                 if !err_msg.is_null() {

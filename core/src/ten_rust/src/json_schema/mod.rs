@@ -109,9 +109,8 @@ pub fn ten_validate_manifest_json_string(data: &str) -> Result<()> {
 }
 
 pub fn ten_validate_manifest_json_file(file_path: &str) -> Result<()> {
-    let file = std::fs::File::open(file_path)?;
-    let reader = std::io::BufReader::new(file);
-    let manifest_json: serde_json::Value = serde_json::from_reader(reader)?;
+    let data = std::fs::read_to_string(file_path)?;
+    let manifest_json: serde_json::Value = json5::from_str(&data)?;
 
     validate_json_object_with_shared_definitions(
         &manifest_json,
@@ -167,9 +166,8 @@ pub fn ten_validate_interface_json_string(data: &str) -> Result<()> {
 pub fn ten_validate_interface_json_file<P: AsRef<Path>>(
     file_path: P,
 ) -> Result<()> {
-    let file = std::fs::File::open(file_path)?;
-    let reader = std::io::BufReader::new(file);
-    let interface_json: serde_json::Value = serde_json::from_reader(reader)?;
+    let data = std::fs::read_to_string(file_path)?;
+    let interface_json: serde_json::Value = json5::from_str(&data)?;
 
     validate_json_object_with_shared_definitions(
         &interface_json,
