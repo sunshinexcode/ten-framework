@@ -56,7 +56,9 @@ class BytedanceTTSDuplexExtension(AsyncTTS2BaseExtension):
                 self.config = BytedanceTTSDuplexConfig.model_validate_json(
                     config_json
                 )
-                self.ten_env.log_info(f"KEYPOINT config: {self.config.to_str()}")
+                self.ten_env.log_info(
+                    f"KEYPOINT config: {self.config.to_str()}"
+                )
 
                 if not self.config.appid:
                     self.ten_env.log_error("get property appid")
@@ -110,11 +112,17 @@ class BytedanceTTSDuplexExtension(AsyncTTS2BaseExtension):
                     if audio_data is not None:
                         if self.config.dump:
                             asyncio.create_task(self.recorder.write(audio_data))
-                        if self.request_start_ts is not None and self.request_ttfb is None:
+                        if (
+                            self.request_start_ts is not None
+                            and self.request_ttfb is None
+                        ):
                             await self.send_tts_audio_start(
-                                self.current_request_id)
+                                self.current_request_id
+                            )
                             elapsed_time = int(
-                                (datetime.now() - self.request_start_ts).total_seconds()
+                                (
+                                    datetime.now() - self.request_start_ts
+                                ).total_seconds()
                                 * 1000
                             )
                             await self.send_tts_ttfb_metrics(
@@ -126,11 +134,13 @@ class BytedanceTTSDuplexExtension(AsyncTTS2BaseExtension):
                             self.ten_env.log_info(
                                 f"KEYPOINT Sent TTFB metrics for request ID: {self.current_request_id}, elapsed time: {elapsed_time}ms"
                             )
-                        self.request_total_audio_duration += self.calculate_audio_duration(
-                            len(audio_data),
-                            self.synthesize_audio_sample_rate(),
-                            self.synthesize_audio_channels(),
-                            self.synthesize_audio_sample_width(),
+                        self.request_total_audio_duration += (
+                            self.calculate_audio_duration(
+                                len(audio_data),
+                                self.synthesize_audio_sample_rate(),
+                                self.synthesize_audio_channels(),
+                                self.synthesize_audio_sample_width(),
+                            )
                         )
                         await self.send_tts_audio_data(audio_data)
                     else:
@@ -143,10 +153,17 @@ class BytedanceTTSDuplexExtension(AsyncTTS2BaseExtension):
                     )
                     if self.request_start_ts is not None:
                         request_event_interval = int(
-                            (datetime.now() - self.request_start_ts).total_seconds()
+                            (
+                                datetime.now() - self.request_start_ts
+                            ).total_seconds()
                             * 1000
                         )
-                        await self.send_tts_audio_end(self.current_request_id, request_event_interval, self.request_total_audio_duration, self.current_turn_id)
+                        await self.send_tts_audio_end(
+                            self.current_request_id,
+                            request_event_interval,
+                            self.request_total_audio_duration,
+                            self.current_turn_id,
+                        )
 
                         self.ten_env.log_info(
                             f"KEYPOINT request time stamped for request ID: {self.current_request_id}, request_event_interval: {request_event_interval}ms, total_audio_duration: {self.request_total_audio_duration}ms"
@@ -169,7 +186,9 @@ class BytedanceTTSDuplexExtension(AsyncTTS2BaseExtension):
             self.client = BytedanceV3Client(
                 self.config, self.ten_env, self.vendor(), self.response_msgs
             )
-            self.ten_env.log_info(F"KEYPOINT Connecting to service for request ID: {self.current_request_id}")
+            self.ten_env.log_info(
+                f"KEYPOINT Connecting to service for request ID: {self.current_request_id}"
+            )
             await self.client.connect()
             await self.client.start_connection()
             await self.client.start_session()
@@ -270,7 +289,6 @@ class BytedanceTTSDuplexExtension(AsyncTTS2BaseExtension):
                 ),
             )
             await self._reconnect()
-
 
     def calculate_audio_duration(
         self,

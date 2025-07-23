@@ -3,7 +3,9 @@ from typing import Any, Dict
 from pydantic import BaseModel, Field
 
 
-def mask_sensitive_data(s: str, unmasked_start: int = 3, unmasked_end: int = 3, mask_char: str = "*") -> str:
+def mask_sensitive_data(
+    s: str, unmasked_start: int = 3, unmasked_end: int = 3, mask_char: str = "*"
+) -> str:
     """
     Mask a sensitive string by replacing the middle part with asterisks.
 
@@ -20,10 +22,11 @@ def mask_sensitive_data(s: str, unmasked_start: int = 3, unmasked_end: int = 3, 
         return mask_char * len(s)
 
     return (
-        s[:unmasked_start] +
-        mask_char * (len(s) - unmasked_start - unmasked_end) +
-        s[-unmasked_end:]
+        s[:unmasked_start]
+        + mask_char * (len(s) - unmasked_start - unmasked_end)
+        + s[-unmasked_end:]
     )
+
 
 class BytedanceTTSDuplexConfig(BaseModel):
     appid: str
