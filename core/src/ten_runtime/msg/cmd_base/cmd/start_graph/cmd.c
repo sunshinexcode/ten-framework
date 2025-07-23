@@ -164,7 +164,7 @@ static bool ten_raw_cmd_start_graph_apply_graph_json_str(
              "Should not happen.");
   TEN_ASSERT(json_str, "Should not happen.");
 
-  ten_json_t *json = ten_json_from_commented_string(json_str, err);
+  ten_json_t *json = ten_json_from_string(json_str, err);
   if (!json) {
     return false;
   }
@@ -201,7 +201,7 @@ static bool ten_raw_cmd_start_graph_set_graph_from_json_str(
 
   ten_cmd_start_graph_t *cmd = (ten_cmd_start_graph_t *)self;
 
-  ten_json_t *json = ten_json_from_commented_string(json_str, err);
+  ten_json_t *json = ten_json_from_string(json_str, err);
   if (!json) {
     return false;
   }

@@ -5,12 +5,12 @@
 # Refer to the "LICENSE" file in the root directory for more information.
 #
 import argparse
-import json
 import os
 import sys
 import platform
 from datetime import datetime
 import time
+import json5
 from build.scripts import fs_utils, cmd_exec, timestamp_proxy
 
 
@@ -269,7 +269,7 @@ def get_pkg_type(pkg_root: str) -> str:
         "r",
         encoding="utf-8",
     ) as f:
-        manifest_json = json.load(f)
+        manifest_json = json5.load(f)
     return manifest_json["type"]
 
 

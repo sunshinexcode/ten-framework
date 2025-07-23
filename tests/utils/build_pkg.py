@@ -4,7 +4,7 @@
 # Licensed under the Apache License, Version 2.0, with certain conditions.
 # Refer to the "LICENSE" file in the root directory for more information.
 #
-import json
+import json5
 import os
 import platform
 from datetime import datetime
@@ -215,7 +215,7 @@ def _build_go_app(args: ArgumentInfo) -> int:
 def _get_pkg_type(pkg_root: str) -> str:
     manifest_path = os.path.join(pkg_root, "manifest.json")
     with open(manifest_path, "r", encoding="utf-8") as f:
-        manifest_json = json.load(f)
+        manifest_json = json5.load(f)
     return manifest_json["type"]
 
 
@@ -269,7 +269,7 @@ def prepare_app(
     )
     info_file = os.path.join(assemble_info_dir, "info.json")
     with open(info_file, "r", encoding="utf-8") as f:
-        info = json.load(f)
+        info = json5.load(f)
         pkg_name = info["src_app"]
         generated_app_src_root_dir_name = info[
             "generated_app_src_root_dir_name"
@@ -351,7 +351,7 @@ def _replace_after_install_app(
     replace_paths_after_install_app: list[str] = []
 
     with open(assemble_info_file, "r", encoding="utf-8") as f:
-        info = json.load(f)
+        info = json5.load(f)
         replace_paths_after_install_app = info[
             "replace_paths_after_install_app"
         ]
@@ -395,7 +395,7 @@ def _replace_after_install_all(
     replace_paths_after_install_all: list[str] = []
 
     with open(assemble_info_file, "r", encoding="utf-8") as f:
-        info = json.load(f)
+        info = json5.load(f)
         replace_paths_after_install_all = info[
             "replace_paths_after_install_all"
         ]

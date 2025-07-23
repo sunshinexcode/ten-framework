@@ -99,6 +99,7 @@ def setup():
             "python-dotenv",
         ]
     )
+
     utils.run_cmd_with_retry(
         [
             sys.executable,
@@ -106,6 +107,16 @@ def setup():
             "pip",
             "install",
             "websocket-client",
+        ]
+    )
+
+    utils.run_cmd_with_retry(
+        [
+            sys.executable,
+            "-m",
+            "pip",
+            "install",
+            "json5",
         ]
     )
 

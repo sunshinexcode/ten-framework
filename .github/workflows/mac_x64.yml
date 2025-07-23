@@ -364,7 +364,7 @@ jobs:
 
       - name: Install Python dependencies via script
         run: |
-          python .github/tools/setup_pytest_dependencies.py
+          python .github/tools/setup_python_dependencies.py
 
           df -h .
 
