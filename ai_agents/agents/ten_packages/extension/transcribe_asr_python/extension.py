@@ -162,6 +162,7 @@ class TranscribeASRExtension(AsyncASRBaseExtension):
                 start_ms=0,
                 duration_ms=0,
                 language=self.config.lang_code,
+                words=[],
                 metadata={"session_id": self.session_id},
             )
             await self.send_asr_transcription(transcription)
