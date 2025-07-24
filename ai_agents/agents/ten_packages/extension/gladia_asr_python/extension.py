@@ -128,7 +128,7 @@ class GladiaASRExtension(AsyncASRBaseExtension):
         self, frame: AudioFrame, session_id: Optional[str]
     ) -> None:
         try:
-            self.session_id = session_id or "default_session"
+            self.session_id = session_id
             chunk = base64.b64encode(frame.get_buf()).decode("utf-8")
             msg = json.dumps({"type": "audio_chunk", "data": {"chunk": chunk}})
             await self.ws.send(msg)
