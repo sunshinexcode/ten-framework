@@ -37,11 +37,9 @@ class ExtensionTesterAliyun(AsyncExtensionTester):
         while not self.stopped:
             chunk = b"\x01\x02" * 160
             audio_frame = AudioFrame.create("pcm_frame")
-            audio_frame.set_property_from_json(None, json.dumps({
-                "metadata": {
-                    "session_id": "test"
-                }
-            }))
+            audio_frame.set_property_from_json(
+                None, json.dumps({"metadata": {"session_id": "test"}})
+            )
             audio_frame.alloc_buf(len(chunk))
             buf = audio_frame.lock_buf()
             buf[:] = chunk
