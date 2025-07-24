@@ -114,7 +114,9 @@ def test_azure(patch_azure_ws):
             threading.Timer(1.0, triggerRecognized).start()
 
         def triggerRecognized():
-            print(f"Triggering recognized event {patch_azure_ws.event_handlers['recognized']}")
+            print(
+                f"Triggering recognized event {patch_azure_ws.event_handlers['recognized']}"
+            )
             evt = SimpleNamespace(
                 result=SimpleNamespace(
                     json=json.dumps(
