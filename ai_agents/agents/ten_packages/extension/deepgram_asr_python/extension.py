@@ -58,6 +58,7 @@ class DeepgramASRExtension(AsyncASRBaseExtension):
         self.last_finalize_timestamp: int = 0
 
     async def on_init(self, ten_env: AsyncTenEnv) -> None:
+        await super().on_init(ten_env)
         ten_env.log_info("DeepgramASRExtension on_init")
 
     async def on_cmd(self, ten_env: AsyncTenEnv, cmd: Cmd) -> None:
@@ -217,6 +218,7 @@ class DeepgramASRExtension(AsyncASRBaseExtension):
     async def send_audio(
         self, frame: AudioFrame, session_id: str | None
     ) -> None:
+        self.session_id = session_id
         frame_buf = frame.get_buf()
         return await self.client.send(frame_buf)
 

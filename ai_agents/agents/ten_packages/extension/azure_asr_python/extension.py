@@ -317,6 +317,7 @@ class AzureASRExtension(AsyncASRBaseExtension):
     async def send_audio(
         self, frame: AudioFrame, session_id: str | None
     ) -> None:
+        self.session_id = session_id
         frame_buf = frame.get_buf()
         self.stream.write(bytes(frame_buf))
 
