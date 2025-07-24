@@ -176,7 +176,6 @@ def test_deepgram_unexpected_result(patch_deepgram_ws):
             )
         return True
 
-
     async def fake_run(*args, **kwargs):
         await asyncio.sleep(1)
         asyncio.create_task(fake_start(*args, **kwargs))
