@@ -158,7 +158,7 @@ class AzureASRExtension(AsyncASRBaseExtension):
 
     async def _on_session_started(self, evt):
         """Handle the session started event from Azure ASR."""
-        self.ten_env.log_debug(
+        self.ten_env.log_info(
             f"azure event callback on_session_started: {evt}"
         )
         self.connected = True

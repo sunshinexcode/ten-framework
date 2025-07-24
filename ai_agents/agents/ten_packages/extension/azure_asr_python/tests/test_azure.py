@@ -107,8 +107,14 @@ class ExtensionTesterAzure(AsyncExtensionTester):
 
 def test_azure(patch_azure_ws):
     def fake_start_continuous_recognition_async_get():
+        def triggerSessionStarted():
+            evt = SimpleNamespace(result=SimpleNamespace(json=json.dumps({})))
+            patch_azure_ws.event_handlers["session_started"](evt)
+
+            threading.Timer(1.0, triggerRecognized).start()
 
         def triggerRecognized():
+            print(f"Triggering recognized event {patch_azure_ws.event_handlers['recognized']}")
             evt = SimpleNamespace(
                 result=SimpleNamespace(
                     json=json.dumps(
@@ -122,7 +128,7 @@ def test_azure(patch_azure_ws):
             )
             patch_azure_ws.event_handlers["recognized"](evt)
 
-        threading.Timer(1.0, triggerRecognized).start()
+        threading.Timer(1.0, triggerSessionStarted).start()
         return None
 
     start_future = MagicMock()
@@ -159,6 +165,12 @@ def test_azure(patch_azure_ws):
 def test_azure_unexpected_result(patch_azure_ws):
     def fake_start_continuous_recognition_async_get():
 
+        def triggerSessionStarted():
+            evt = SimpleNamespace(result=SimpleNamespace(json=json.dumps({})))
+            patch_azure_ws.event_handlers["session_started"](evt)
+
+            threading.Timer(1.0, triggerRecognized).start()
+
         def triggerRecognized():
             evt = SimpleNamespace(
                 result=SimpleNamespace(
@@ -173,7 +185,7 @@ def test_azure_unexpected_result(patch_azure_ws):
             )
             patch_azure_ws.event_handlers["recognized"](evt)
 
-        threading.Timer(1.0, triggerRecognized).start()
+        threading.Timer(0.1, triggerSessionStarted).start()
         return None
 
     start_future = MagicMock()
