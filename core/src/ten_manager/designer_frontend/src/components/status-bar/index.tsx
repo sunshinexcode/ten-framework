@@ -71,6 +71,11 @@ const StatusApps = () => {
       metadata: {
         type: EDefaultWidgetType.AppsManager,
       },
+      popup: {
+        width: 0.5,
+        height: 0.8,
+        maxWidth: 800,
+      },
     });
   };
 
