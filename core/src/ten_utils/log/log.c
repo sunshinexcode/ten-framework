@@ -191,7 +191,8 @@ void ten_log_log(ten_log_t *self, TEN_LOG_LEVEL level, const char *func_name,
   TEN_ASSERT(ten_log_check_integrity(self), "Invalid argument.");
 
   if (self->advanced_impl.impl) {
-    self->advanced_impl.impl(self, level, func_name, file_name, line_no, msg);
+    self->advanced_impl.impl(self, level, "", func_name, file_name, line_no,
+                             msg);
     return;
   }
 
