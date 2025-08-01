@@ -5,63 +5,34 @@
 // Refer to the "LICENSE" file in the root directory for more information.
 //
 
-import { zodResolver } from "@hookform/resolvers/zod";
 import {
   BrushCleaningIcon,
-  FolderIcon,
   FolderMinusIcon,
   FolderPlusIcon,
   FolderSyncIcon,
   HardDriveDownloadIcon,
   PlayIcon,
+  RotateCcwIcon,
+  SquareIcon,
 } from "lucide-react";
 import * as React from "react";
-import { useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
-import { z } from "zod";
 import {
-  postCreateApp,
   postReloadApps,
   postUnloadApps,
-  retrieveTemplatePkgs,
   useFetchAppScripts,
   useFetchApps,
 } from "@/api/services/apps";
 import { useGraphs } from "@/api/services/graphs";
-import { AppFileManager } from "@/components/file-manager/app-folder";
 import {
   AppFolderPopupTitle,
   AppRunPopupTitle,
 } from "@/components/popup/default/app";
 import { LogViewerPopupTitle } from "@/components/popup/log-viewer";
 import { SpinnerLoading } from "@/components/status/loading";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import {
-  Form,
-  FormControl,
-  FormDescription,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -88,30 +59,66 @@ import {
 } from "@/constants/widgets";
 import { cn } from "@/lib/utils";
 import { useDialogStore, useFlowStore, useWidgetStore } from "@/store";
-import {
-  AppCreateReqSchema,
-  ETemplateLanguage,
-  ETemplateType,
-  TemplatePkgsReqSchema,
-} from "@/types/apps";
+import { ELocalAppStatus } from "@/types/apps";
 import {
   EDefaultWidgetType,
   ELogViewerScriptType,
   EWidgetCategory,
   EWidgetDisplayType,
+  type ILogViewerWidget,
 } from "@/types/widgets";
 
 export const AppsManagerWidget = (props: { className?: string }) => {
   const [isUnloading, setIsUnloading] = React.useState<boolean>(false);
   const [isReloading, setIsReloading] = React.useState<boolean>(false);
+  const [appStatuses, setAppStatuses] = React.useState<
+    Record<string, ELocalAppStatus>
+  >({});
 
   const { t } = useTranslation();
   const { data: loadedApps, isLoading, error, mutate } = useFetchApps();
   const { mutate: reloadGraphs } = useGraphs();
-  const { appendWidget, removeBackstageWidget, removeLogViewerHistory } =
-    useWidgetStore();
+  const {
+    appendWidget,
+    backstageWidgets, // Track running backstage widgets
+    removeBackstageWidget,
+    removeLogViewerHistory,
+  } = useWidgetStore();
   const { setNodesAndEdges } = useFlowStore();
   const { appendDialog, removeDialog } = useDialogStore();
+
+  // Initialize app statuses with LOADED status
+  React.useEffect(() => {
+    if (loadedApps?.app_info) {
+      const statuses: Record<string, ELocalAppStatus> = {};
+      loadedApps.app_info.forEach((app) => {
+        const targetBackstageWidget = backstageWidgets.find(
+          (widget) =>
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            ((widget as ILogViewerWidget)?.metadata?.script as any)
+              ?.base_dir === app.base_dir
+        );
+        statuses[app.base_dir] = targetBackstageWidget
+          ? ELocalAppStatus.RUNNING
+          : ELocalAppStatus.LOADED;
+      });
+      setAppStatuses(statuses);
+    }
+  }, [loadedApps, backstageWidgets]);
+
+  const handleStopApps = (baseDir: string) => {
+    const backstageIds = backstageWidgets
+      .filter(
+        (widget) =>
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          ((widget as ILogViewerWidget)?.metadata?.script as any)?.base_dir ===
+          baseDir
+      )
+      .map((widget) => widget.widget_id);
+    backstageIds.forEach((id) => {
+      removeBackstageWidget(id);
+    });
+  };
 
   const openAppFolderPopup = () => {
     appendWidget({
@@ -217,7 +224,7 @@ export const AppsManagerWidget = (props: { className?: string }) => {
   };
 
   const handleAppInstallAll = (baseDir: string) => {
-    const widgetId = "app-install-" + Date.now();
+    const widgetId = `app-install-${Date.now()}`;
     appendWidget({
       container_id: CONTAINER_DEFAULT_ID,
       group_id: GROUP_LOG_VIEWER_ID,
@@ -239,7 +246,7 @@ export const AppsManagerWidget = (props: { className?: string }) => {
           title: t("popup.logViewer.appInstall"),
         },
         postActions: async () => {
-          await reloadApps(baseDir);
+          //   await reloadApps(baseDir);
         },
       },
       popup: {
@@ -247,8 +254,9 @@ export const AppsManagerWidget = (props: { className?: string }) => {
         height: 0.8,
       },
       actions: {
-        onClose: () => {
+        onClose: async () => {
           removeBackstageWidget(widgetId);
+          await reloadApps(baseDir);
         },
         custom_actions: [
           {
@@ -265,10 +273,11 @@ export const AppsManagerWidget = (props: { className?: string }) => {
   };
 
   const handleRunApp = (baseDir: string, scripts: string[]) => {
+    // Start frontstage widget (this can be closed without affecting backstage)
     appendWidget({
       container_id: CONTAINER_DEFAULT_ID,
       group_id: APP_RUN_WIDGET_ID,
-      widget_id: APP_RUN_WIDGET_ID + "-" + baseDir,
+      widget_id: `${APP_RUN_WIDGET_ID}-${baseDir}`,
 
       category: EWidgetCategory.Default,
       display_type: EWidgetDisplayType.Popup,
@@ -290,100 +299,151 @@ export const AppsManagerWidget = (props: { className?: string }) => {
     if (error) {
       toast.error(t("popup.apps.error"));
     }
-  }, [error]);
+  }, [error, t]);
 
   return (
-    <div
-      className={cn(
-        "flex h-full w-full flex-col gap-2 overflow-y-auto",
-        props.className
-      )}
-    >
-      <Table>
-        <TableCaption className="select-none">
-          {t("popup.apps.tableCaption")}
-        </TableCaption>
-        <TableHeader>
-          <TableRow>
-            <TableHead className="w-14">{t("dataTable.no")}</TableHead>
-            <TableHead>{t("dataTable.name")}</TableHead>
-            <TableHead className="text-right">
-              {t("dataTable.actions")}
-            </TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {isLoading ? (
-            <TableRow>
-              <TableCell colSpan={3}>
-                <SpinnerLoading />
+    <TooltipProvider>
+      <div
+        className={cn(
+          "flex h-full w-full flex-col gap-2 overflow-y-auto",
+          props.className
+        )}
+      >
+        <Table className="h-fit w-full border-none">
+          <TableHeader>
+            <TableRow className="border-none bg-muted/50 hover:bg-muted/50">
+              <TableHead className="w-12 border-none text-center">
+                {t("dataTable.no")}
+              </TableHead>
+              <TableHead className="border-none">
+                {t("dataTable.name")}
+              </TableHead>
+              <TableHead className="border-none text-center">
+                {t("popup.apps.status")}
+              </TableHead>
+              <TableHead className="border-none text-center">
+                {t("dataTable.actions")}
+              </TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {isLoading && (
+              <TableRow className="border-none hover:bg-transparent">
+                <TableCell colSpan={4} className="border-none">
+                  <SpinnerLoading />
+                </TableCell>
+              </TableRow>
+            )}
+            {!isLoading && loadedApps?.app_info?.length === 0 && (
+              <TableRow className="border-none hover:bg-transparent">
+                <TableCell
+                  colSpan={4}
+                  className="border-none text-center text-muted-foreground"
+                >
+                  {t("popup.apps.emptyPlaceholder")}
+                </TableCell>
+              </TableRow>
+            )}
+            {!isLoading &&
+              loadedApps?.app_info?.length &&
+              loadedApps?.app_info?.map((app, index) => (
+                <TableRow
+                  key={app.base_dir}
+                  className="border-none hover:bg-muted/30"
+                >
+                  <TableCell
+                    className={cn(
+                      "border-none text-center",
+                      "font-mono text-sm"
+                    )}
+                  >
+                    {(index + 1).toString().padStart(2, "0")}
+                  </TableCell>
+                  <TableCell className="border-none">
+                    <span
+                      className={cn(
+                        "rounded-md bg-muted p-1 px-2",
+                        "font-medium text-xs"
+                      )}
+                    >
+                      {app.base_dir}
+                    </span>
+                  </TableCell>
+                  <TableCell className="border-none text-center">
+                    <Badge className="ml-2" variant="secondary">
+                      {`<TODO>`}
+                    </Badge>
+                  </TableCell>
+                  <AppRowActions
+                    baseDir={app.base_dir}
+                    status={appStatuses[app.base_dir] || "stopped"}
+                    isLoading={isLoadingMemo}
+                    handleUnloadApp={handleUnloadApp}
+                    handleReloadApp={handleReloadApp}
+                    handleAppInstallAll={handleAppInstallAll}
+                    handleRunApp={handleRunApp}
+                    handleStopApps={handleStopApps}
+                  />
+                </TableRow>
+              ))}
+          </TableBody>
+          <TableFooter className="border-none bg-transparent">
+            <TableRow className="border-none hover:bg-transparent">
+              <TableCell
+                colSpan={4}
+                className="space-x-2 border-none text-right"
+              >
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={openAppFolderPopup}
+                  disabled={isLoadingMemo}
+                  className="gap-2 bg-transparent"
+                >
+                  <FolderPlusIcon className="h-4 w-4" />
+                  {t("header.menuApp.loadApp")}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={isLoadingMemo}
+                  onClick={() => handleReloadApp()}
+                  className="gap-2 bg-transparent"
+                >
+                  <FolderSyncIcon className="h-4 w-4" />
+                  <span>{t("header.menuApp.reloadAllApps")}</span>
+                </Button>
               </TableCell>
             </TableRow>
-          ) : (
-            loadedApps?.app_info?.map((app, index) => (
-              <TableRow key={app.base_dir}>
-                <TableCell className="font-medium">{index + 1}</TableCell>
-                <TableCell>
-                  <span className={cn("rounded-md bg-muted p-1 px-2 text-xs")}>
-                    {app.base_dir}
-                  </span>
-                </TableCell>
-                <AppRowActions
-                  baseDir={app.base_dir}
-                  isLoading={isLoadingMemo}
-                  handleUnloadApp={handleUnloadApp}
-                  handleReloadApp={handleReloadApp}
-                  handleAppInstallAll={handleAppInstallAll}
-                  handleRunApp={handleRunApp}
-                />
-              </TableRow>
-            ))
-          )}
-        </TableBody>
-        <TableFooter className="bg-transparent">
-          <TableRow>
-            <TableCell colSpan={3} className="space-x-2 text-right">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={openAppFolderPopup}
-                disabled={isLoadingMemo}
-              >
-                <FolderPlusIcon className="h-4 w-4" />
-                {t("header.menuApp.loadApp")}
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={isLoadingMemo}
-                onClick={() => handleReloadApp()}
-              >
-                <FolderSyncIcon className="h-4 w-4" />
-                <span>{t("header.menuApp.reloadAllApps")}</span>
-              </Button>
-            </TableCell>
-          </TableRow>
-        </TableFooter>
-      </Table>
-    </div>
+          </TableFooter>
+        </Table>
+        <TableCaption className="mt-auto select-none">
+          {t("popup.apps.tableCaption")}
+        </TableCaption>
+      </div>
+    </TooltipProvider>
   );
 };
 
 const AppRowActions = (props: {
   baseDir: string;
+  status: ELocalAppStatus;
   isLoading?: boolean;
   handleUnloadApp: (baseDir: string) => void;
   handleReloadApp: (baseDir: string) => void;
   handleAppInstallAll: (baseDir: string) => void;
   handleRunApp: (baseDir: string, scripts: string[]) => void;
+  handleStopApps: (baseDir: string) => void;
 }) => {
   const {
     baseDir,
+    status,
     isLoading,
     handleUnloadApp,
     handleReloadApp,
     handleAppInstallAll,
     handleRunApp,
+    handleStopApps,
   } = props;
 
   const { t } = useTranslation();
@@ -392,6 +452,16 @@ const AppRowActions = (props: {
     isLoading: isScriptsLoading,
     error: scriptsError,
   } = useFetchAppScripts(baseDir);
+  const { backstageWidgets } = useWidgetStore();
+
+  const relatedBackstageWidges = React.useMemo(() => {
+    return backstageWidgets.filter(
+      (widget) =>
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        ((widget as ILogViewerWidget)?.metadata?.script as any)?.base_dir ===
+        baseDir
+    );
+  }, [baseDir, backstageWidgets]);
 
   React.useEffect(() => {
     if (scriptsError) {
@@ -402,77 +472,68 @@ const AppRowActions = (props: {
             : t("popup.apps.error"),
       });
     }
-  }, [scriptsError]);
+  }, [scriptsError, t]);
+
+  const handleStopAll = () => {
+    handleStopApps(baseDir);
+  };
+
+  const handleReload = () => {
+    handleReloadApp(baseDir);
+  };
+
+  if (isLoading) {
+    return (
+      <TableCell colSpan={4} className="border-none text-center">
+        <SpinnerLoading className="mx-auto size-4" />
+      </TableCell>
+    );
+  }
 
   return (
-    <TableCell className="flex items-center gap-2 text-right">
-      <TooltipProvider>
+    <TableCell>
+      <div className="flex justify-center gap-1">
+        {relatedBackstageWidges.length > 0 && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleStopAll}
+                className="h-8 w-8 p-0"
+                disabled={isLoading}
+              >
+                <SquareIcon className="h-3 w-3" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>{t("action.stop")}</TooltipContent>
+          </Tooltip>
+        )}
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
               variant="outline"
-              size="icon"
-              disabled={isLoading}
-              onClick={() => handleUnloadApp(baseDir)}
-            >
-              <FolderMinusIcon className="h-4 w-4" />
-              <span className="sr-only">{t("header.menuApp.unloadApp")}</span>
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>{t("header.menuApp.unloadApp")}</p>
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
-
-      <TooltipProvider>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="outline"
-              size="icon"
-              disabled={isLoading}
-              onClick={() => handleReloadApp(baseDir)}
-            >
-              <FolderSyncIcon className="h-4 w-4" />
-              <span className="sr-only">{t("header.menuApp.reloadApp")}</span>
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>{t("header.menuApp.reloadApp")}</p>
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
-
-      <TooltipProvider>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="outline"
-              size="icon"
+              size="sm"
               disabled={isLoading}
               onClick={() => handleAppInstallAll(baseDir)}
+              className="h-8 w-8 p-0"
             >
-              <HardDriveDownloadIcon className="h-4 w-4" />
-              <span className="sr-only">{t("header.menuApp.installAll")}</span>
+              <HardDriveDownloadIcon className="h-3 w-3" />
             </Button>
           </TooltipTrigger>
-          <TooltipContent>
-            <p>{t("header.menuApp.installAll")}</p>
-          </TooltipContent>
+          <TooltipContent>{t("header.menuApp.installAll")}</TooltipContent>
         </Tooltip>
-      </TooltipProvider>
 
-      <TooltipProvider>
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
               variant="outline"
-              size="icon"
+              size="sm"
               disabled={isLoading || isScriptsLoading || scripts?.length === 0}
               onClick={() => {
                 handleRunApp(baseDir, scripts);
               }}
+              className="h-8 w-8 p-0"
             >
               {isScriptsLoading ? (
                 <SpinnerLoading className="size-4" />
@@ -481,11 +542,42 @@ const AppRowActions = (props: {
               )}
             </Button>
           </TooltipTrigger>
-          <TooltipContent>
-            <p>{t("header.menuApp.runApp")}</p>
-          </TooltipContent>
+          <TooltipContent>{t("header.menuApp.runApp")}</TooltipContent>
         </Tooltip>
-      </TooltipProvider>
+
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleReload}
+              className="h-8 w-8 p-0"
+              disabled={isLoading}
+            >
+              <RotateCcwIcon className="h-3 w-3" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>{t("header.menuApp.reloadApp")}</TooltipContent>
+        </Tooltip>
+
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="outline"
+              size="sm"
+              className={cn(
+                "h-8 w-8 bg-transparent p-0",
+                "text-destructive hover:text-destructive"
+              )}
+              disabled={isLoading}
+              onClick={() => handleUnloadApp(baseDir)}
+            >
+              <FolderMinusIcon className="h-3 w-3" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>{t("header.menuApp.unloadApp")}</TooltipContent>
+        </Tooltip>
+      </div>
     </TableCell>
   );
 };

@@ -38,6 +38,7 @@ import {
   GROUP_LOG_VIEWER_ID,
   RTC_INTERACTION_WIDGET_ID,
 } from "@/constants/widgets";
+import { EWidgetIdentifier } from "@/lib/identifier";
 import { useAppStore, useWidgetStore } from "@/store";
 import {
   EDefaultWidgetType,
@@ -135,12 +136,8 @@ export const AppRunPopupContent = (props: { widget: IDefaultWidget }) => {
 
   const { t } = useTranslation();
 
-  const {
-    removeWidget,
-    appendWidget,
-    removeBackstageWidget,
-    removeLogViewerHistory,
-  } = useWidgetStore();
+  const { removeWidget, appendWidget, removeLogViewerHistory } =
+    useWidgetStore();
 
   const [selectedScript, setSelectedScript] = React.useState<
     string | undefined
@@ -150,7 +147,7 @@ export const AppRunPopupContent = (props: { widget: IDefaultWidget }) => {
   const handleRun = async () => {
     removeWidget(widget.widget_id);
 
-    const newAppStartWidgetId = "app-start-" + Date.now();
+    const newAppStartWidgetId = EWidgetIdentifier.APP_RUN + Date.now();
 
     await addRecentRunApp({
       base_dir: baseDir || "",
@@ -186,7 +183,9 @@ export const AppRunPopupContent = (props: { widget: IDefaultWidget }) => {
       },
       actions: {
         onClose: () => {
-          removeBackstageWidget(newAppStartWidgetId);
+          // Update(apps-manager):
+          // keep the backstage widget after closing the popup
+          // removeBackstageWidget(newAppStartWidgetId);
         },
         custom_actions: [
           {
