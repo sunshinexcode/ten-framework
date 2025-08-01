@@ -25,3 +25,25 @@ void ten_encrypt_log_deinit(void *user_data) {
   ten_cipher_destroy(cipher);
 #endif
 }
+
+void ten_log_rust_log_func(ten_log_t *self, TEN_LOG_LEVEL level,
+                           const char *category, const char *func_name,
+                           const char *file_name, size_t line_no,
+                           const char *msg) {
+  TEN_ASSERT(self, "Invalid argument.");
+  TEN_ASSERT(self->advanced_impl.impl, "Invalid argument.");
+  TEN_ASSERT(self->advanced_impl.config, "Invalid argument.");
+
+  int64_t pid = 0;
+  int64_t tid = 0;
+  ten_get_pid_tid(&pid, &tid);
+
+  ten_rust_log(self->advanced_impl.config, category, pid, tid, level, func_name,
+               file_name, line_no, msg);
+}
+
+void ten_log_rust_config_deinit(void *config) {
+  TEN_ASSERT(config, "Invalid argument.");
+
+  ten_rust_log_config_destroy(config);
+}
