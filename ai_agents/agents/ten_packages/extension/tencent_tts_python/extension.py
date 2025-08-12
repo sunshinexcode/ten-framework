@@ -22,6 +22,7 @@ from ten_runtime import AsyncTenEnv
 
 from .config import TencentTTSConfig
 from .tencent_tts import (
+    ERROR_CODE_AUTHORIZATION_FAILED,
     MESSAGE_TYPE_PCM,
     TencentTTSClient,
     TencentTTSTaskFailedException,
@@ -226,11 +227,16 @@ class TencentTTSExtension(AsyncTTS2BaseExtension):
             self.ten_env.log_error(
                 f"TencentTTSTaskFailedException in request_tts: {e.error_msg} (code: {e.error_code}). text: {t.text}, current_request_id: {self.current_request_id}, current_turn_id: {self.current_turn_id}"
             )
+            code = ModuleErrorCode.NON_FATAL_ERROR.value
+
+            if e.error_code == ERROR_CODE_AUTHORIZATION_FAILED:
+                code = ModuleErrorCode.FATAL_ERROR.value
+
             await self._send_tts_error(
                 e.error_msg,
                 str(e.error_code),
                 e.error_msg,
-                code=ModuleErrorCode.NON_FATAL_ERROR.value,
+                code=code,
             )
 
         except ModuleVendorException as e:

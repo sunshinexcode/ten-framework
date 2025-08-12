@@ -23,6 +23,9 @@ MESSAGE_TYPE_PCM = 1
 WS_CMD_STOP = "stop"
 WS_CMD_CANCEL = "cancel"
 
+# Error code reference: https://cloud.tencent.com/document/product/1073/108595
+ERROR_CODE_AUTHORIZATION_FAILED = 10003
+
 
 class TencentTTSTaskFailedException(Exception):
     """Exception raised when Tencent TTS task fails"""
@@ -64,6 +67,9 @@ class TencentTTSClient:
         self._ws_cmd_queue: asyncio.Queue[dict[str, object]] | None = None
         self._ws_need_wait_ready_event: asyncio.Event | None = None
         self._ws_receive_task: asyncio.Task[None] | None = None
+
+        # Retry control flag
+        self._reconnect_allowed: bool = True
 
     async def cancel(self) -> None:
         """
@@ -261,6 +267,14 @@ class TencentTTSClient:
         and WebSocket receive operations concurrently.
         """
         while True:
+            # Check if WebSocket reconnection is allowed at the beginning of each loop iteration
+            if not self._reconnect_allowed:
+                self.ten_env.log_error(
+                    "WebSocket reconnection disabled, stopping TTS response loop"
+                )
+                await self._receive_queue.put((True, MESSAGE_TYPE_PCM, b""))
+                return
+
             try:
                 if self._ws_need_wait_ready_event != None:
                     await asyncio.wait_for(
@@ -286,6 +300,9 @@ class TencentTTSClient:
                         else:
                             resp = json.loads(result)
                             if resp["code"] != 0:
+                                self.ten_env.log_error(
+                                    f"_receive_tts_response_and_cmd tencent tts get error:{resp}"
+                                )
                                 raise TencentTTSTaskFailedException(
                                     resp["code"], resp["message"]
                                 )
@@ -315,7 +332,25 @@ class TencentTTSClient:
                             "tts resp message type is not str and bytes"
                         )
 
+            except TencentTTSTaskFailedException as e:
+                self.ten_env.log_error(
+                    f"_receive_tts_response_and_cmd tencent tts get error:{e}"
+                )
+                # If it's an authorization error, disable retry and end the method
+                if e.error_code == ERROR_CODE_AUTHORIZATION_FAILED:
+                    self.ten_env.log_error(
+                        f"Authorization failed, disabling retry. Error: {e.error_msg} (code: {e.error_code})"
+                    )
+                    self._reconnect_allowed = False
+                    await self._receive_queue.put((True, MESSAGE_TYPE_PCM, b""))
+                    return
+
+                # For other errors, continue with reconnection
+                await self._receive_queue.put((True, MESSAGE_TYPE_PCM, b""))
+                await self._ws_reconnect()
+
             except Exception as e:
+                # For general exceptions, continue with reconnection
                 await self._receive_queue.put((True, MESSAGE_TYPE_PCM, b""))
                 await self._ws_reconnect()
                 self.ten_env.log_error(
@@ -351,6 +386,13 @@ class TencentTTSClient:
         self._ws_need_wait_ready_event = asyncio.Event()
 
         while True:
+            # Check if WebSocket reconnection is allowed at the beginning of each loop iteration
+            if not self._reconnect_allowed:
+                self.ten_env.log_error(
+                    "WebSocket reconnection disabled, stopping reconnection attempts"
+                )
+                break
+
             try:
                 if self._ws != None:
                     # Call self._ws_close() immediately need several seconds, so here use create_task
@@ -374,6 +416,18 @@ class TencentTTSClient:
                             return
                     else:
                         raise TypeError("tts resp message type is not str")
+            except TencentTTSTaskFailedException as e:
+                self.ten_env.log_error(
+                    f"__ws_reconnect tencent tts get error:{e}"
+                )
+                # If it's an authorization error, disable retry and break the loop
+                if e.error_code == ERROR_CODE_AUTHORIZATION_FAILED:
+                    self.ten_env.log_error(
+                        f"Authorization failed, disabling retry. Error: {e.error_msg} (code: {e.error_code})"
+                    )
+                    self._reconnect_allowed = False
+                    break
+
             except Exception as e:
                 self.ten_env.log_error(
                     f"__ws_reconnect tencent tts get error:{e}"
