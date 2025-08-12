@@ -22,6 +22,7 @@ from ten_runtime import AsyncTenEnv
 
 from .config import CosyTTSConfig
 from .cosy_tts import (
+    ERROR_CODE_TTS_FAILED,
     MESSAGE_TYPE_PCM,
     CosyTTSClient,
     CosyTTSTaskFailedException,
@@ -164,6 +165,7 @@ class CosyTTSExtension(AsyncTTS2BaseExtension):
                 f"Calling client.synthesize_audio() with text: {t.text}, current_request_id: {self.current_request_id}, current_turn_id: {self.current_turn_id}"
             )
 
+            # synthesize_audio returns an AsyncIterator, so we can use async for directly
             data = self.client.synthesize_audio(t.text, t.text_input_end)
             self.ten_env.log_info(f"Got data generator: {data}")
 
@@ -231,17 +233,23 @@ class CosyTTSExtension(AsyncTTS2BaseExtension):
             self.ten_env.log_error(
                 f"CosyTTSTaskFailedException in request_tts: {e.error_msg} (code: {e.error_code}). text: {t.text}, current_request_id: {self.current_request_id}, current_turn_id: {self.current_turn_id}"
             )
+            code = ModuleErrorCode.NON_FATAL_ERROR.value
+
+            if e.error_code == ERROR_CODE_TTS_FAILED:
+                code = ModuleErrorCode.FATAL_ERROR.value
+
             await self._send_tts_error(
                 e.error_msg,
                 str(e.error_code),
                 e.error_msg,
-                code=ModuleErrorCode.NON_FATAL_ERROR.value,
+                code=code,
             )
 
         except ModuleVendorException as e:
             self.ten_env.log_error(
                 f"ModuleVendorException in request_tts: {traceback.format_exc()}. text: {t.text}, current_request_id: {self.current_request_id}, current_turn_id: {self.current_turn_id}"
             )
+
             await self._send_tts_error(
                 str(e),
                 e.error.code,

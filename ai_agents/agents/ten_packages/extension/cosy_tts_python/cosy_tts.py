@@ -17,6 +17,8 @@ MESSAGE_TYPE_PCM = 1
 MESSAGE_TYPE_CMD_COMPLETE = 2
 MESSAGE_TYPE_CMD_ERROR = 3
 
+ERROR_CODE_TTS_FAILED = -1
+
 
 class CosyTTSTaskFailedException(Exception):
     """Exception raised when Cosy TTS task fails"""
@@ -231,7 +233,10 @@ class CosyTTSClient:
 
         except Exception as e:
             self.ten_env.log_error(f"TTS synthesis failed: {e}")
-            await self._receive_queue.put((True, MESSAGE_TYPE_PCM, b""))
+            raise CosyTTSTaskFailedException(
+                error_code=ERROR_CODE_TTS_FAILED,
+                error_msg=str(e),
+            )
 
     def _duration_in_ms(self, start: datetime, end: datetime) -> int:
         """
