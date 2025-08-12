@@ -138,7 +138,7 @@ class TencentTTSClient:
 
         finally:
             self.ten_env.log_info(
-                f"websocket loop done, cost_time {self._duration_in_ms_since(start_time)}ms"
+                f"websocket loop done, duration {self._duration_in_ms_since(start_time)}ms"
             )
 
     async def reset_turn_id(self) -> None:
@@ -332,7 +332,7 @@ class TencentTTSClient:
         start_time = datetime.now()
         await self._ws.close()
         self.ten_env.log_info(
-            f"__ws_close_task done, time cost:{self._duration_in_ms_since(start_time)}"
+            f"__ws_close_task done, duration:{self._duration_in_ms_since(start_time)}ms"
         )
 
     async def _ws_reconnect(self) -> None:
