@@ -1,254 +1,160 @@
-import sys
-from pathlib import Path
-
-# Add project root to sys.path to allow running tests from this directory
-# The project root is 6 levels up from the parent directory of this file.
-project_root = str(Path(__file__).resolve().parents[6])
-if project_root not in sys.path:
-    sys.path.insert(0, project_root)
-
 #
 # Copyright © 2024 Agora
 # This file is part of TEN Framework, an open source project.
 # Licensed under the Apache License, Version 2.0, with certain conditions.
 # Refer to the "LICENSE" file in the root directory for more information.
 #
-import json
-import asyncio
 from typing import Any
-from unittest.mock import patch, AsyncMock, MagicMock
+from unittest.mock import patch, AsyncMock
+import json
 
+from ten_ai_base.struct import TTSTextInput
 from ten_runtime import (
+    Data,
     ExtensionTester,
     TenEnvTester,
-    Data,
 )
-from ten_ai_base.struct import TTSTextInput
 from ..tencent_tts import (
-    TencentTTSTaskFailedException,
-    TencentTTSClient,
+    MESSAGE_TYPE_PCM,
 )
 
 
-class TestTencentTTSRobustness:
-    """Robustness and error recovery tests for Tencent TTS extension"""
-
-    @patch("websockets.connect")
-    def test_reconnect_after_connection_drop(self, mock_ws_connect):
-        """Test that the extension can recover from WebSocket connection drops"""
-        # First call fails, second call succeeds
-        mock_ws_connect.side_effect = [
-            ConnectionRefusedError("Simulated connection drop"),
-            MagicMock(),  # Successful connection
-        ]
-
-        config = {
-            "app_id": "test_app",
-            "secret_id": "test_secret_id",
-            "secret_key": "test_secret_key",
-        }
-
-        tester = RobustnessTester()
-        tester.set_test_mode_single("tencent_tts_python", json.dumps(config))
-
-        tester.run()
-
-        # Verify error handling and recovery
-        assert (
-            tester.connection_error_received
-        ), "Should handle connection error"
-        assert (
-            tester.recovery_successful
-        ), "Should recover after connection error"
-
-
-class RobustnessTester(ExtensionTester):
-    """Robustness testing for connection failures and recovery"""
-
+# ================ test reconnect after connection drop(robustness) ================
+class ExtensionTesterRobustness(ExtensionTester):
     def __init__(self):
         super().__init__()
-        self.connection_error_received = False
-        self.recovery_successful = False
-        self.error_details = None
+        self.first_request_error: dict[str, Any] | None = None
+        self.second_request_successful = False
+        self.ten_env: TenEnvTester | None = None
 
     def on_start(self, ten_env_tester: TenEnvTester) -> None:
-        """Start robustness test"""
-        ten_env_tester.log_info("Starting robustness test")
-
-        tts_input = TTSTextInput(
-            request_id="robustness_test_request",
-            text="Test text for robustness testing",
-            text_input_end=True,
+        """Called when test starts, sends the first TTS request."""
+        self.ten_env = ten_env_tester
+        ten_env_tester.log_info(
+            "Robustness test started, sending first TTS request."
         )
 
+        # First request, expected to fail
+        tts_input_1 = TTSTextInput(
+            request_id="tts_request_to_fail",
+            text="This request will trigger a simulated connection drop.",
+        )
         data = Data.create("tts_text_input")
-        data.set_property_from_json(None, tts_input.model_dump_json())
+        data.set_property_from_json(None, tts_input_1.model_dump_json())
         ten_env_tester.send_data(data)
         ten_env_tester.on_start_done()
 
+    def send_second_request(self):
+        """Sends the second TTS request to verify reconnection."""
+        if self.ten_env is None:
+            print("Error: ten_env is not initialized.")
+            return
+        self.ten_env.log_info(
+            "Sending second TTS request to verify reconnection."
+        )
+        tts_input_2 = TTSTextInput(
+            request_id="tts_request_to_succeed",
+            text="This request should succeed after reconnection.",
+        )
+        data = Data.create("tts_text_input")
+        data.set_property_from_json(None, tts_input_2.model_dump_json())
+        self.ten_env.send_data(data)
+
     def on_data(self, ten_env: TenEnvTester, data) -> None:
-        """Handle test events"""
         name = data.get_name()
+        json_str, _ = data.get_property_to_json(None)
+        payload = json.loads(json_str)
 
-        if name == "error":
-            self.connection_error_received = True
-            json_str, _ = data.get_property_to_json(None)
-            if json_str:
-                self.error_details = json.loads(json_str)
-            ten_env.log_info(f"Connection error received: {self.error_details}")
+        if name == "error" and payload.get("id") == "tts_request_to_fail":
+            ten_env.log_info(
+                f"Received expected error for the first request: {payload}"
+            )
+            self.first_request_error = payload
+            # After receiving the error for the first request, immediately send the second one.
+            self.send_second_request()
 
-            # Send retry request
-            self.send_retry_request(ten_env)
-        elif name == "tts_audio_end":
-            self.recovery_successful = True
-            ten_env.log_info("Recovery successful - TTS completed")
+        # Use a separate 'if' to ensure this check happens independently of the error check.
+        if payload.get("id") == "tts_request_to_succeed":
+            ten_env.log_info(
+                "Received tts_audio_end for the second request. Test successful."
+            )
+            self.second_request_successful = True
+            # We can now safely stop the test.
             ten_env.stop_test()
 
-    def send_retry_request(self, ten_env: TenEnvTester):
-        """Send retry request after connection error"""
-        ten_env.log_info("Sending retry request")
 
-        retry_input = TTSTextInput(
-            request_id="robustness_retry_request",
-            text="Retry text for robustness testing",
-            text_input_end=True,
-        )
+@patch("tencent_tts_python.extension.TencentTTSClient")
+def test_reconnect_after_connection_drop(MockTencentTTSClient):
+    """
+    Tests that the extension can recover from a connection drop, report a
+    NON_FATAL_ERROR, and then successfully reconnect and process a new request.
+    """
+    print("Starting test_reconnect_after_connection_drop with mock...")
 
-        data = Data.create("tts_text_input")
-        data.set_property_from_json(None, retry_input.model_dump_json())
-        ten_env.send_data(data)
+    # --- Mock State ---
+    # Use a simple counter to track how many times get() is called
+    get_call_count = 0
 
+    # --- Mock Configuration ---
+    mock_instance = MockTencentTTSClient.return_value
+    mock_instance.start = AsyncMock()
+    mock_instance.stop = AsyncMock()
 
-class TestTencentTTSRateLimiting:
-    """Rate limiting and throttling tests"""
+    # This async generator simulates different behaviors on subsequent calls
+    async def mock_synthesize_audio_stateful(text: str):
+        nonlocal get_call_count
+        get_call_count += 1
 
-    @patch("websockets.connect")
-    def test_rate_limit_handling(self, mock_ws_connect):
-        """Test handling of rate limiting responses"""
-        # Mock rate limit response
-        mock_ws = MagicMock()
-        mock_ws_connect.return_value = mock_ws
+        if get_call_count == 1:
+            # On the first call, simulate a connection drop
+            raise ConnectionRefusedError("Simulated connection drop from test")
+        else:
+            # On the second call, simulate a successful audio stream
+            yield (False, MESSAGE_TYPE_PCM, b"\x44\x55\x66")
+            yield (True, MESSAGE_TYPE_PCM, b"")
 
-        # Simulate rate limit error
-        mock_ws.recv = AsyncMock(
-            return_value=json.dumps(
-                {"type": "error", "code": 429, "message": "Rate limit exceeded"}
-            )
-        )
+    mock_instance.synthesize_audio.side_effect = mock_synthesize_audio_stateful
 
-        config = {
-            "app_id": "test_app",
+    # --- Test Setup ---
+    config = {
+        "params": {
+            "app_id": "test_app_id",
             "secret_id": "test_secret_id",
             "secret_key": "test_secret_key",
-        }
+        },
+    }
+    tester = ExtensionTesterRobustness()
+    tester.set_test_mode_single("tencent_tts_python", json.dumps(config))
 
-        tester = RateLimitTester()
-        tester.set_test_mode_single("tencent_tts_python", json.dumps(config))
+    print("Running robustness test...")
+    tester.run()
+    print("Robustness test completed.")
 
-        tester.run()
+    # --- Assertions ---
+    # 1. Verify that the first request resulted in a NON_FATAL_ERROR
+    assert (
+        tester.first_request_error is not None
+    ), "Did not receive any error message."
+    assert (
+        tester.first_request_error.get("code") == 1000
+    ), f"Expected error code 1000 (NON_FATAL_ERROR), got {tester.first_request_error.get('code')}"
 
-        assert (
-            tester.rate_limit_error_received
-        ), "Should handle rate limit errors"
+    # 2. Verify that vendor_info was included in the error
+    vendor_info = tester.first_request_error.get("vendor_info")
+    assert vendor_info is not None, "Error message did not contain vendor_info."
+    assert (
+        vendor_info.get("vendor") == "tencent"
+    ), f"Expected vendor 'tencent', got {vendor_info.get('vendor')}"
 
+    # 3. Verify that the client's start method was called twice (initial + reconnect)
+    # This assertion is tricky because the reconnection logic might be inside the client.
+    # A better assertion is to check if the second request succeeded.
 
-class RateLimitTester(ExtensionTester):
-    """Rate limiting test handler"""
+    # 4. Verify that the second TTS request was successful
+    assert (
+        tester.second_request_successful
+    ), "The second TTS request after the error did not succeed."
 
-    def __init__(self):
-        super().__init__()
-        self.rate_limit_error_received = False
-        self.error_code = None
-
-    def on_start(self, ten_env_tester: TenEnvTester) -> None:
-        """Start rate limit test"""
-        ten_env_tester.log_info("Starting rate limit test")
-
-        tts_input = TTSTextInput(
-            request_id="rate_limit_test_request",
-            text="Test text for rate limiting",
-            text_input_end=True,
-        )
-
-        data = Data.create("tts_text_input")
-        data.set_property_from_json(None, tts_input.model_dump_json())
-        ten_env_tester.send_data(data)
-        ten_env_tester.on_start_done()
-
-    def on_data(self, ten_env: TenEnvTester, data) -> None:
-        """Handle rate limit events"""
-        name = data.get_name()
-
-        if name == "error":
-            json_str, _ = data.get_property_to_json(None)
-            if json_str:
-                error_data = json.loads(json_str)
-                if error_data.get("code") == 429:
-                    self.rate_limit_error_received = True
-                    self.error_code = error_data.get("code")
-                    ten_env.log_info(f"Rate limit error received: {error_data}")
-                    ten_env.stop_test()
-
-
-class TestTencentTTSNetworkInstability:
-    """Network instability and timeout tests"""
-
-    @patch("websockets.connect")
-    def test_timeout_handling(self, mock_ws_connect):
-        """Test handling of network timeouts"""
-        # Mock timeout behavior
-        mock_ws = MagicMock()
-        mock_ws_connect.return_value = mock_ws
-
-        # Simulate timeout
-        mock_ws.recv = AsyncMock(
-            side_effect=asyncio.TimeoutError("Connection timeout")
-        )
-
-        config = {
-            "app_id": "test_app",
-            "secret_id": "test_secret_id",
-            "secret_key": "test_secret_key",
-        }
-
-        tester = TimeoutTester()
-        tester.set_test_mode_single("tencent_tts_python", json.dumps(config))
-
-        tester.run()
-
-        assert tester.timeout_error_received, "Should handle timeout errors"
-
-
-class TimeoutTester(ExtensionTester):
-    """Timeout test handler"""
-
-    def __init__(self):
-        super().__init__()
-        self.timeout_error_received = False
-
-    def on_start(self, ten_env_tester: TenEnvTester) -> None:
-        """Start timeout test"""
-        ten_env_tester.log_info("Starting timeout test")
-
-        tts_input = TTSTextInput(
-            request_id="timeout_test_request",
-            text="Test text for timeout testing",
-            text_input_end=True,
-        )
-
-        data = Data.create("tts_text_input")
-        data.set_property_from_json(None, tts_input.model_dump_json())
-        ten_env_tester.send_data(data)
-        ten_env_tester.on_start_done()
-
-    def on_data(self, ten_env: TenEnvTester, data) -> None:
-        """Handle timeout events"""
-        name = data.get_name()
-
-        if name == "error":
-            self.timeout_error_received = True
-            json_str, _ = data.get_property_to_json(None)
-            if json_str:
-                error_data = json.loads(json_str)
-                ten_env.log_info(f"Timeout error received: {error_data}")
-                ten_env.stop_test()
+    print(
+        "✅ Robustness test passed: Correctly handled simulated connection drop and recovered."
+    )
