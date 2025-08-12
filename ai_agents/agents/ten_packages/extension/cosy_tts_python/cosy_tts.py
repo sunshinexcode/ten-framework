@@ -209,7 +209,7 @@ class CosyTTSClient:
                         break
 
                     done, message_type, data = await asyncio.wait_for(
-                        self._receive_queue.get(), timeout=1
+                        self._receive_queue.get(), timeout=5
                     )
 
                     # Yield the data

@@ -162,7 +162,7 @@ def test_invalid_params_fatal_error(MockCosyTTSClient):
     mock_instance.synthesize_audio.side_effect = mock_synthesize_audio_error
 
     # --- Test Setup ---
-    # Config with valid api_key and group_id so on_init passes and can proceed
+    # Config with api_key so on_init passes and can proceed
     # to the request_tts call where the mock will be triggered.
     invalid_params_config = {
         "params": {
