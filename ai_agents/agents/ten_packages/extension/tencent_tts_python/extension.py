@@ -16,7 +16,7 @@ from ten_ai_base.message import (
     ModuleType,
     ModuleVendorException,
 )
-from ten_ai_base.struct import TTSFlush, TTSTextInput
+from ten_ai_base.struct import TTSTextInput
 from ten_ai_base.tts2 import AsyncTTS2BaseExtension, DATA_FLUSH
 from ten_runtime import AsyncTenEnv
 
@@ -131,7 +131,6 @@ class TencentTTSExtension(AsyncTTS2BaseExtension):
                 )
 
                 self.current_request_id = t.request_id
-                self.request_total_audio_duration = 0
                 self.request_ttfb = None
 
                 if t.metadata is not None:
@@ -409,7 +408,7 @@ class TencentTTSExtension(AsyncTTS2BaseExtension):
             request_id or self.current_request_id,
             ModuleError(
                 message=message,
-                module="tts",  # Use string directly instead of enum
+                module=ModuleType.TTS,
                 code=code,
                 vendor_info=vendor_info,
             ),

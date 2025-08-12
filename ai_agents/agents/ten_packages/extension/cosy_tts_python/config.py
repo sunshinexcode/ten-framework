@@ -28,22 +28,14 @@ def mask_sensitive_data(
     )
 
 
-# Docs: https://cloud.tencent.com/document/product/1073/108595
-class TencentTTSConfig(BaseModel):
-    # Tencent Cloud credentials
-    app_id: str = ""  # Tencent Cloud App ID
-    secret_key: str = ""  # Tencent Cloud Secret Key
-    secret_id: str = ""  # Tencent Cloud Secret ID
+class CosyTTSConfig(BaseModel):
+    # Cosy TTS credentials
+    api_key: str = ""  # Cosy TTS API Key
 
     # TTS specific configs
-    codec: str = "pcm"  # Audio codec
-    emotion_category: str = ""  # Emotion category
-    emotion_intensity: int = 0  # Emotion intensity
-    enable_words: bool = False  # Enable word-level timing
-    sample_rate: int = 24000  # Audio sample rate
-    speed: float = 0  # Speed range [-2.0, 6.0]
-    voice_type: str = "0"  # Voice type ID
-    volume: float = 0  # Volume range [-10, 10]
+    model: str = "cosyvoice-v1"  # Model name
+    sample_rate: int = 16000  # Audio sample rate
+    voice: str = "longxiaochun"  # Voice name
 
     # Debug and dump settings
     dump: bool = False
@@ -60,11 +52,11 @@ class TencentTTSConfig(BaseModel):
         config = copy.deepcopy(self)
 
         # Encrypt sensitive fields
-        if config.secret_key:
-            config.secret_key = mask_sensitive_data(config.secret_key)
-        if config.params and "secret_key" in config.params:
-            config.params["secret_key"] = mask_sensitive_data(
-                config.params["secret_key"]
+        if config.api_key:
+            config.api_key = mask_sensitive_data(config.api_key)
+        if config.params and "api_key" in config.params:
+            config.params["api_key"] = mask_sensitive_data(
+                config.params["api_key"]
             )
 
         return f"{config}"
@@ -72,16 +64,10 @@ class TencentTTSConfig(BaseModel):
     def update_params(self) -> None:
         """Update config attributes from params dictionary."""
         param_names = [
-            "app_id",
-            "secret_key",
-            "secret_id",
-            "emotion_category",
-            "emotion_intensity",
-            "enable_words",
+            "api_key",
+            "model",
             "sample_rate",
-            "speed",
-            "voice_type",
-            "volume",
+            "voice",
         ]
 
         for param_name in param_names:
@@ -91,9 +77,7 @@ class TencentTTSConfig(BaseModel):
     def validate_params(self) -> None:
         """Validate required configuration parameters."""
         required_fields = [
-            "app_id",
-            "secret_key",
-            "secret_id",
+            "api_key",
         ]
 
         for field_name in required_fields:
