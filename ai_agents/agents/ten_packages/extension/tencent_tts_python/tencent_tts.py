@@ -75,7 +75,7 @@ class TencentTTSClient:
         await self._ws_cmd_queue.put(WS_CMD_CANCEL)
         self.ten_env.log_info("__ws_receive_task had cancel done")
 
-    async def close(self) -> None:
+    async def stop(self) -> None:
         """
         Close the TTS client and cleanup resources.
 

@@ -94,7 +94,7 @@ class TencentTTSExtension(AsyncTTS2BaseExtension):
 
     async def on_stop(self, ten_env: AsyncTenEnv) -> None:
         if self.client:
-            await self.client.close()
+            await self.client.stop()
 
         if self.recorder:
             await self.recorder.flush()
