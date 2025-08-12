@@ -36,7 +36,7 @@ class AsyncIteratorCallback(ResultCallback):
     def __init__(
         self,
         ten_env: AsyncTenEnv,
-        queue: asyncio.Queue[tuple[bool, int, str, bytes | None]],
+        queue: asyncio.Queue[tuple[bool, int, str | bytes | None]],
     ) -> None:
         self.ten_env = ten_env
 
@@ -118,7 +118,7 @@ class CosyTTSClient:
 
         # Communication queue for audio data
         self._receive_queue: (
-            asyncio.Queue[tuple[bool, int, str, bytes | None]] | None
+            asyncio.Queue[tuple[bool, int, str | bytes | None]] | None
         ) = None
 
         # Set dashscope API key
@@ -160,7 +160,7 @@ class CosyTTSClient:
             # Clean up synthesizer
             self.synthesizer = None
 
-    async def close(self) -> None:
+    async def stop(self) -> None:
         """
         Close the TTS client and cleanup resources.
         """
@@ -185,7 +185,7 @@ class CosyTTSClient:
 
     async def synthesize_audio(
         self, text: str, text_input_end: bool
-    ) -> AsyncIterator[tuple[bool, int, bytes | None]]:
+    ) -> AsyncIterator[tuple[bool, int, str | bytes | None]]:
         """Convert text to speech audio stream using Cosy TTS service."""
         start_time = datetime.now()
 
