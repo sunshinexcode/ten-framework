@@ -104,9 +104,7 @@ class TencentTTSClient:
 
         try:
             if self._ws_need_wait_ready_event != None:
-                await asyncio.wait_for(
-                    self._ws_need_wait_ready_event.wait(), timeout=5
-                )
+                await asyncio.wait_for(self._ws_need_wait_ready_event.wait(), timeout=5)
 
             data = json.dumps(
                 # TODO(lint)
@@ -235,20 +233,14 @@ class TencentTTSClient:
         session_id = str(uuid.uuid1())
         # TODO(lint)
         # pylint: disable=protected-access
-        params = self._synthesizer._FlowingSpeechSynthesizer__gen_params(
-            session_id
-        )
+        params = self._synthesizer._FlowingSpeechSynthesizer__gen_params(session_id)
         # TODO(lint)
         # pylint: disable=protected-access
-        signature = self._synthesizer._FlowingSpeechSynthesizer__gen_signature(
+        signature = self._synthesizer._FlowingSpeechSynthesizer__gen_signature(params)
+        # TODO(lint)
+        # pylint: disable=protected-access
+        req_url = self._synthesizer._FlowingSpeechSynthesizer__create_query_string(
             params
-        )
-        # TODO(lint)
-        # pylint: disable=protected-access
-        req_url = (
-            self._synthesizer._FlowingSpeechSynthesizer__create_query_string(
-                params
-            )
         )
         req_url += "&Signature=%s" % urllib.parse.quote(signature)
 
@@ -329,9 +321,7 @@ class TencentTTSClient:
                             )
 
                     else:
-                        raise TypeError(
-                            "tts resp message type is not str and bytes"
-                        )
+                        raise TypeError("tts resp message type is not str and bytes")
 
             except TencentTTSTaskFailedException as e:
                 self.ten_env.log_error(
@@ -421,9 +411,7 @@ class TencentTTSClient:
                     else:
                         raise TypeError("tts resp message type is not str")
             except TencentTTSTaskFailedException as e:
-                self.ten_env.log_error(
-                    f"__ws_reconnect tencent tts get error:{e}"
-                )
+                self.ten_env.log_error(f"__ws_reconnect tencent tts get error:{e}")
                 # If it's an authorization error, disable retry and break the loop
                 if (
                     e.error_code == ERROR_CODE_INVALID_PARAMS
@@ -436,8 +424,6 @@ class TencentTTSClient:
                     break
 
             except Exception as e:
-                self.ten_env.log_error(
-                    f"__ws_reconnect tencent tts get error:{e}"
-                )
+                self.ten_env.log_error(f"__ws_reconnect tencent tts get error:{e}")
 
                 await asyncio.sleep(1)  # avoid too fast retry

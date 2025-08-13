@@ -137,7 +137,7 @@ class TencentTTSExtension(AsyncTTS2BaseExtension):
         """
         try:
             self.ten_env.log_info(
-                f"KEYPOINT Requesting TTS for text: {t.text}, text_input_end: {t.text_input_end} request ID: {t.request_id}"
+                f"KEYPOINT Requesting TTS for text: {t.text}, text_input_end: {t.text_input_end}, request_id: {t.request_id}, current_request_id: {self.current_request_id}"
             )
 
             if t.request_id != self.current_request_id:
@@ -146,6 +146,8 @@ class TencentTTSExtension(AsyncTTS2BaseExtension):
                 )
 
                 self.current_request_id = t.request_id
+                self.current_request_finished = False
+                self.total_audio_bytes = 0  # Reset for new request
                 self.request_ttfb = None
 
                 if t.metadata is not None:
@@ -156,15 +158,14 @@ class TencentTTSExtension(AsyncTTS2BaseExtension):
                 await self._manage_pcm_writers(t.request_id)
 
             elif self.current_request_finished:
-                if not t.text_input_end:
-                    error_msg = f"Received a message for a finished request_id '{t.request_id}' with text_input_end=False."
-                    self.ten_env.log_error(error_msg)
-                    await self._send_tts_error(
-                        error_msg,
-                        vendor_info=ModuleErrorVendorInfo(vendor=self.vendor()),
-                        code=ModuleErrorCode.NON_FATAL_ERROR.value,
-                        request_id=t.request_id,
-                    )
+                error_msg = f"Received a message for a finished request_id '{t.request_id}' with text_input_end=False."
+                self.ten_env.log_error(error_msg)
+                await self._send_tts_error(
+                    error_msg,
+                    vendor_info=ModuleErrorVendorInfo(vendor=self.vendor()),
+                    code=ModuleErrorCode.NON_FATAL_ERROR.value,
+                    request_id=t.request_id,
+                )
                 return
 
             # Check if text is empty
@@ -232,7 +233,7 @@ class TencentTTSExtension(AsyncTTS2BaseExtension):
                         # Send audio data
                         await self.send_tts_audio_data(audio_chunk)
                     else:
-                        self.ten_env.log_error(
+                        self.ten_env.log_info(
                             f"Received empty payload for TTS response, current_request_id: {self.current_request_id}, current_turn_id: {self.current_turn_id}"
                         )
 
