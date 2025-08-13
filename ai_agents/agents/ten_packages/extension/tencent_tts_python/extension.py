@@ -23,6 +23,7 @@ from ten_runtime import AsyncTenEnv
 from .config import TencentTTSConfig
 from .tencent_tts import (
     ERROR_CODE_AUTHORIZATION_FAILED,
+    ERROR_CODE_INVALID_PARAMS,
     MESSAGE_TYPE_PCM,
     TencentTTSClient,
     TencentTTSTaskFailedException,
@@ -229,7 +230,10 @@ class TencentTTSExtension(AsyncTTS2BaseExtension):
             )
             code = ModuleErrorCode.NON_FATAL_ERROR.value
 
-            if e.error_code == ERROR_CODE_AUTHORIZATION_FAILED:
+            if (
+                e.error_code == ERROR_CODE_INVALID_PARAMS
+                or e.error_code == ERROR_CODE_AUTHORIZATION_FAILED
+            ):
                 code = ModuleErrorCode.FATAL_ERROR.value
 
             await self._send_tts_error(

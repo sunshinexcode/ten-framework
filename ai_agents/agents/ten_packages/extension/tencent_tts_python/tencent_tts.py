@@ -24,6 +24,7 @@ WS_CMD_STOP = "stop"
 WS_CMD_CANCEL = "cancel"
 
 # Error code reference: https://cloud.tencent.com/document/product/1073/108595
+ERROR_CODE_INVALID_PARAMS = 10001
 ERROR_CODE_AUTHORIZATION_FAILED = 10003
 
 
@@ -337,9 +338,12 @@ class TencentTTSClient:
                     f"_receive_tts_response_and_cmd tencent tts get error:{e}"
                 )
                 # If it's an authorization error, disable retry and end the method
-                if e.error_code == ERROR_CODE_AUTHORIZATION_FAILED:
+                if (
+                    e.error_code == ERROR_CODE_INVALID_PARAMS
+                    or e.error_code == ERROR_CODE_AUTHORIZATION_FAILED
+                ):
                     self.ten_env.log_error(
-                        f"Authorization failed, disabling retry. Error: {e.error_msg} (code: {e.error_code})"
+                        f"Tencent TTS failed, disabling retry. Error: {e.error_msg} (code: {e.error_code})"
                     )
                     self._reconnect_allowed = False
                     await self._receive_queue.put((True, MESSAGE_TYPE_PCM, b""))
@@ -421,9 +425,12 @@ class TencentTTSClient:
                     f"__ws_reconnect tencent tts get error:{e}"
                 )
                 # If it's an authorization error, disable retry and break the loop
-                if e.error_code == ERROR_CODE_AUTHORIZATION_FAILED:
+                if (
+                    e.error_code == ERROR_CODE_INVALID_PARAMS
+                    or e.error_code == ERROR_CODE_AUTHORIZATION_FAILED
+                ):
                     self.ten_env.log_error(
-                        f"Authorization failed, disabling retry. Error: {e.error_msg} (code: {e.error_code})"
+                        f"Tencent TTS failed, disabling retry. Error: {e.error_msg} (code: {e.error_code})"
                     )
                     self._reconnect_allowed = False
                     break
