@@ -95,14 +95,7 @@ class TencentTTSExtension(AsyncTTS2BaseExtension):
             await self.client.stop()
 
         # Clean up all PCMWriters
-        for request_id, recorder in self.recorder_map.items():
-            try:
-                await recorder.flush()
-                ten_env.log_info(f"Flushed PCMWriter for request_id: {request_id}")
-            except Exception as e:
-                ten_env.log_error(
-                    f"Error flushing PCMWriter for request_id {request_id}: {e}"
-                )
+        await self._cleanup_all_pcm_writers()
 
         await super().on_stop(ten_env)
         ten_env.log_debug("on_stop")
@@ -156,31 +149,9 @@ class TencentTTSExtension(AsyncTTS2BaseExtension):
                     self.session_id = t.metadata.get("session_id", "")
                     self.current_turn_id = t.metadata.get("turn_id", -1)
 
-                # Create new PCMWriter for new request_id and clean up old ones
-                if self.config and self.config.dump:
-                    # Clean up old PCMWriters (except current request_id)
-                    old_request_ids = [
-                        rid for rid in self.recorder_map.keys() if rid != t.request_id
-                    ]
-                    for old_rid in old_request_ids:
-                        try:
-                            await self.recorder_map[old_rid].flush()
-                            del self.recorder_map[old_rid]
-                            self.ten_env.log_info(
-                                f"Cleaned up old PCMWriter for request_id: {old_rid}"
-                            )
-                        except Exception as e:
-                            self.ten_env.log_error(
-                                f"Error cleaning up PCMWriter for request_id {old_rid}: {e}"
-                            )
+                # Manage PCMWriter instances for audio recording
+                await self._manage_pcm_writers(t.request_id)
 
-                    # Create new PCMWriter
-                    if t.request_id not in self.recorder_map:
-                        dump_file_path = self._get_pcm_dump_file_path(t.request_id)
-                        self.recorder_map[t.request_id] = PCMWriter(dump_file_path)
-                        self.ten_env.log_info(
-                            f"Created PCMWriter for request_id: {t.request_id}, file: {dump_file_path}"
-                        )
             elif self.current_request_finished:
                 if not t.text_input_end:
                     error_msg = f"Received a message for a finished request_id '{t.request_id}' with text_input_end=False."
@@ -370,6 +341,23 @@ class TencentTTSExtension(AsyncTTS2BaseExtension):
         duration_seconds = bytes_length / bytes_per_second
         return int(duration_seconds * 1000)
 
+    async def _cleanup_all_pcm_writers(self) -> None:
+        """
+        Clean up all PCMWriter instances.
+        This is typically called during shutdown or cleanup operations.
+        """
+        for request_id, recorder in self.recorder_map.items():
+            try:
+                await recorder.flush()
+                self.ten_env.log_info(f"Flushed PCMWriter for request_id: {request_id}")
+            except Exception as e:
+                self.ten_env.log_error(
+                    f"Error flushing PCMWriter for request_id {request_id}: {e}"
+                )
+
+        # Clear the recorder map
+        self.recorder_map.clear()
+
     async def _flush(self) -> None:
         """
         Flush the TTS request.
@@ -453,6 +441,40 @@ class TencentTTSExtension(AsyncTTS2BaseExtension):
 
             self.ten_env.log_info(
                 f"KEYPOINT Sent TTS audio end event, interval: {request_event_interval}ms, duration: {self.request_total_audio_duration_ms}ms, current_request_id: {self.current_request_id}, current_turn_id: {self.current_turn_id}"
+            )
+
+    async def _manage_pcm_writers(self, request_id: str) -> None:
+        """
+        Manage PCMWriter instances for audio recording.
+        Creates new PCMWriter for current request and cleans up old ones.
+
+        Args:
+            request_id: Current request ID to keep active
+        """
+        if not self.config or not self.config.dump:
+            return
+
+        # Clean up old PCMWriters (except current request_id)
+        old_request_ids = [rid for rid in self.recorder_map.keys() if rid != request_id]
+
+        for old_rid in old_request_ids:
+            try:
+                await self.recorder_map[old_rid].flush()
+                del self.recorder_map[old_rid]
+                self.ten_env.log_info(
+                    f"Cleaned up old PCMWriter for request_id: {old_rid}"
+                )
+            except Exception as e:
+                self.ten_env.log_error(
+                    f"Error cleaning up PCMWriter for request_id {old_rid}: {e}"
+                )
+
+        # Create new PCMWriter if needed
+        if request_id not in self.recorder_map:
+            dump_file_path = self._get_pcm_dump_file_path(request_id)
+            self.recorder_map[request_id] = PCMWriter(dump_file_path)
+            self.ten_env.log_info(
+                f"Created PCMWriter for request_id: {request_id}, file: {dump_file_path}"
             )
 
     async def _send_tts_error(
