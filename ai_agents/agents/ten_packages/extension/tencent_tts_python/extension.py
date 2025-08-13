@@ -49,8 +49,6 @@ class TencentTTSExtension(AsyncTTS2BaseExtension):
         self.flushed_request_ids: set[str] = set()
         # Extension name for logging and identification
         self.name: str = name
-        # Path to PCM dump file for audio recording
-        self.pcm_dump_file: str | None = None
         # Store PCMWriter instances for different request_ids
         self.recorder_map: dict[str, PCMWriter] = {}
         # Timestamp when TTS request was sent to service
