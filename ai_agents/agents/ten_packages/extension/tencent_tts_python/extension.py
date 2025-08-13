@@ -17,7 +17,7 @@ from ten_ai_base.message import (
     ModuleVendorException,
     TTSAudioEndReason,
 )
-from ten_ai_base.struct import TTSTextInput
+from ten_ai_base.struct import TTSTextInput, TTSTextResult
 from ten_ai_base.tts2 import AsyncTTS2BaseExtension, DATA_FLUSH
 from ten_runtime import AsyncTenEnv
 
@@ -123,7 +123,9 @@ class TencentTTSExtension(AsyncTTS2BaseExtension):
                     )
 
                     if self.request_start_ts:
-                        await self._handle_tts_audio_end(TTSAudioEndReason.INTERRUPTED)
+                        await self._handle_tts_audio_end(
+                            None, TTSAudioEndReason.INTERRUPTED
+                        )
                         self.current_request_finished = True
 
         await super().on_data(ten_env, data)
@@ -239,7 +241,7 @@ class TencentTTSExtension(AsyncTTS2BaseExtension):
                     self.ten_env.log_info(
                         f"All pcm received done, current_request_id: {self.current_request_id}, current_turn_id: {self.current_turn_id}"
                     )
-                    await self._handle_tts_audio_end()
+                    await self._handle_tts_audio_end(t)
                     break
 
             self.ten_env.log_info(
@@ -413,7 +415,9 @@ class TencentTTSExtension(AsyncTTS2BaseExtension):
             )
 
     async def _handle_tts_audio_end(
-        self, reason: TTSAudioEndReason = TTSAudioEndReason.REQUEST_END
+        self,
+        t: TTSTextInput | None,
+        reason: TTSAudioEndReason = TTSAudioEndReason.REQUEST_END,
     ) -> None:
         """
         Handle TTS audio end processing.
@@ -425,6 +429,7 @@ class TencentTTSExtension(AsyncTTS2BaseExtension):
         4. Logs the operation
         """
         if self.request_start_ts:
+            # Calculate total audio duration
             self.request_total_audio_duration_ms = self._calculate_audio_duration(
                 self.total_audio_bytes, self.config.sample_rate
             )
@@ -432,6 +437,21 @@ class TencentTTSExtension(AsyncTTS2BaseExtension):
                 (datetime.now() - self.request_start_ts).total_seconds() * 1000
             )
 
+            if t is not None:
+                # Send TTS text result
+                await self.send_tts_text_result(
+                    TTSTextResult(
+                        request_id=self.current_request_id,
+                        text=t.text,
+                        text_result_end=t.text_input_end,
+                        start_ms=0,
+                        duration_ms=self.request_total_audio_duration_ms,
+                        words=[],
+                        metadata={},
+                    )
+                )
+
+            # Send TTS audio end event
             await self.send_tts_audio_end(
                 self.current_request_id,
                 request_event_interval,
