@@ -50,7 +50,11 @@ class TencentTTSConfig(BaseModel):
     dump_path: str = "/tmp"
 
     # Parameters
+    black_list_params: list[str] = Field(default_factory=list)
     params: dict[str, Any] = Field(default_factory=dict)
+
+    def is_black_list_params(self, key: str) -> bool:
+        return key in self.black_list_params
 
     def to_str(self, sensitive_handling: bool = True) -> str:
         """Convert config to string with optional sensitive data handling."""
@@ -85,7 +89,9 @@ class TencentTTSConfig(BaseModel):
         ]
 
         for param_name in param_names:
-            if param_name in self.params:
+            if param_name in self.params and not self.is_black_list_params(
+                param_name
+            ):
                 setattr(self, param_name, self.params[param_name])
 
     def validate_params(self) -> None:
