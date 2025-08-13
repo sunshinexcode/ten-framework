@@ -14,6 +14,7 @@ from ten_ai_base.message import (
     ModuleErrorCode,
     ModuleErrorVendorInfo,
     ModuleVendorException,
+    TTSAudioEndReason,
 )
 from ten_ai_base.struct import TTSTextInput
 from ten_ai_base.tts2 import AsyncTTS2BaseExtension, DATA_FLUSH
@@ -43,12 +44,14 @@ class TencentTTSExtension(AsyncTTS2BaseExtension):
         self.current_request_id: str | None = None
         # Turn ID for conversation tracking
         self.current_turn_id: int = -1
+        # Set of request ids that have been flushed
+        self.flushed_request_ids: set[str] = set()
         # Extension name for logging and identification
         self.name: str = name
         # Path to PCM dump file for audio recording
         self.pcm_dump_file: str | None = None
-        # PCM writer for dumping audio data to file
-        self.recorder: PCMWriter | None = None
+        # Store PCMWriter instances for different request_ids
+        self.recorder_map: dict[str, PCMWriter] = {}
         # Timestamp when TTS request was sent to service
         self.request_start_ts: datetime | None = None
         # Total audio duration for current request in milliseconds
@@ -71,16 +74,10 @@ class TencentTTSExtension(AsyncTTS2BaseExtension):
                 # Update params from config
                 self.config.update_params()
 
-                self.ten_env.log_info(
-                    f"KEYPOINT config: {self.config.to_str()}"
-                )
+                self.ten_env.log_info(f"KEYPOINT config: {self.config.to_str()}")
 
                 # Validate params
                 self.config.validate_params()
-
-            # Setup PCM dump file
-            self.pcm_dump_file = self._get_pcm_dump_file_path()
-            self.recorder = PCMWriter(self.pcm_dump_file)
 
             # Initialize Tencent TTS client
             self.client = TencentTTSClient(self.config, ten_env, self.vendor())
@@ -97,8 +94,15 @@ class TencentTTSExtension(AsyncTTS2BaseExtension):
         if self.client:
             await self.client.stop()
 
-        if self.recorder:
-            await self.recorder.flush()
+        # Clean up all PCMWriters
+        for request_id, recorder in self.recorder_map.items():
+            try:
+                await recorder.flush()
+                ten_env.log_info(f"Flushed PCMWriter for request_id: {request_id}")
+            except Exception as e:
+                ten_env.log_error(
+                    f"Error flushing PCMWriter for request_id {request_id}: {e}"
+                )
 
         await super().on_stop(ten_env)
         ten_env.log_debug("on_stop")
@@ -113,6 +117,20 @@ class TencentTTSExtension(AsyncTTS2BaseExtension):
 
         if data.get_name() == DATA_FLUSH:
             await self._flush()
+
+            flush_id, _ = data.get_property_string("flush_id")
+            if flush_id:
+                ten_env.log_info(f"Received flush request for ID: {flush_id}")
+                self.flushed_request_ids.add(flush_id)
+
+                if self.current_request_id and self.current_request_id == flush_id:
+                    ten_env.log_info(
+                        f"Current request {self.current_request_id} is being flushed. Sending INTERRUPTED."
+                    )
+
+                    if self.request_start_ts:
+                        await self._handle_tts_audio_end(TTSAudioEndReason.INTERRUPTED)
+                        self.current_request_finished = True
 
         await super().on_data(ten_env, data)
 
@@ -137,6 +155,32 @@ class TencentTTSExtension(AsyncTTS2BaseExtension):
                 if t.metadata is not None:
                     self.session_id = t.metadata.get("session_id", "")
                     self.current_turn_id = t.metadata.get("turn_id", -1)
+
+                # Create new PCMWriter for new request_id and clean up old ones
+                if self.config and self.config.dump:
+                    # Clean up old PCMWriters (except current request_id)
+                    old_request_ids = [
+                        rid for rid in self.recorder_map.keys() if rid != t.request_id
+                    ]
+                    for old_rid in old_request_ids:
+                        try:
+                            await self.recorder_map[old_rid].flush()
+                            del self.recorder_map[old_rid]
+                            self.ten_env.log_info(
+                                f"Cleaned up old PCMWriter for request_id: {old_rid}"
+                            )
+                        except Exception as e:
+                            self.ten_env.log_error(
+                                f"Error cleaning up PCMWriter for request_id {old_rid}: {e}"
+                            )
+
+                    # Create new PCMWriter
+                    if t.request_id not in self.recorder_map:
+                        dump_file_path = self._get_pcm_dump_file_path(t.request_id)
+                        self.recorder_map[t.request_id] = PCMWriter(dump_file_path)
+                        self.ten_env.log_info(
+                            f"Created PCMWriter for request_id: {t.request_id}, file: {dump_file_path}"
+                        )
             elif self.current_request_finished:
                 if not t.text_input_end:
                     error_msg = f"Received a message for a finished request_id '{t.request_id}' with text_input_end=False."
@@ -156,6 +200,14 @@ class TencentTTSExtension(AsyncTTS2BaseExtension):
                     self.current_request_finished = True
                 return
 
+            # Check if request is flushed
+            if self.current_request_id in self.flushed_request_ids:
+                self.ten_env.log_info(
+                    f"Request {self.current_request_id} was flushed. Stopping processing."
+                )
+                self.flushed_request_ids.remove(self.current_request_id)
+                return
+
             # Record TTFB timing
             if self.request_start_ts is None:
                 self.request_start_ts = datetime.now()
@@ -172,6 +224,14 @@ class TencentTTSExtension(AsyncTTS2BaseExtension):
             first_chunk = True
 
             async for [done, message_type, message] in data:
+                # Check if request is flushed
+                if self.current_request_id in self.flushed_request_ids:
+                    self.ten_env.log_info(
+                        f"Request {self.current_request_id} was flushed. Stopping processing."
+                    )
+                    self.flushed_request_ids.remove(self.current_request_id)
+                    break
+
                 self.ten_env.log_info(
                     f"Received done: {done}, message_type: {message_type}, current_request_id: {self.current_request_id}, current_turn_id: {self.current_turn_id}"
                 )
@@ -320,7 +380,7 @@ class TencentTTSExtension(AsyncTTS2BaseExtension):
             )
             await self.client.cancel()
 
-    def _get_pcm_dump_file_path(self) -> str:
+    def _get_pcm_dump_file_path(self, request_id: str) -> str:
         """
         Get the PCM dump file path.
 
@@ -333,7 +393,7 @@ class TencentTTSExtension(AsyncTTS2BaseExtension):
             )
 
         return os.path.join(
-            self.config.dump_path, generate_file_name(f"{self.name}_out")
+            self.config.dump_path, generate_file_name(f"{self.name}_out_{request_id}")
         )
 
     async def _handle_first_audio_chunk(self) -> None:
@@ -363,7 +423,9 @@ class TencentTTSExtension(AsyncTTS2BaseExtension):
                 f"KEYPOINT Sent TTS audio start and TTFB metrics: {self.request_ttfb}ms, current_request_id: {self.current_request_id}, current_turn_id: {self.current_turn_id}"
             )
 
-    async def _handle_tts_audio_end(self) -> None:
+    async def _handle_tts_audio_end(
+        self, reason: TTSAudioEndReason = TTSAudioEndReason.REQUEST_END
+    ) -> None:
         """
         Handle TTS audio end processing.
 
@@ -374,10 +436,8 @@ class TencentTTSExtension(AsyncTTS2BaseExtension):
         4. Logs the operation
         """
         if self.request_start_ts:
-            self.request_total_audio_duration_ms = (
-                self._calculate_audio_duration(
-                    self.total_audio_bytes, self.config.sample_rate
-                )
+            self.request_total_audio_duration_ms = self._calculate_audio_duration(
+                self.total_audio_bytes, self.config.sample_rate
             )
             request_event_interval = int(
                 (datetime.now() - self.request_start_ts).total_seconds() * 1000
@@ -388,6 +448,7 @@ class TencentTTSExtension(AsyncTTS2BaseExtension):
                 request_event_interval,
                 self.request_total_audio_duration_ms,
                 self.current_turn_id,
+                reason,
             )
 
             self.ten_env.log_info(
@@ -427,8 +488,15 @@ class TencentTTSExtension(AsyncTTS2BaseExtension):
         """
         Write audio chunk to dump file if enabled.
         """
-        if self.config and self.config.dump and self.recorder:
+        if (
+            self.config
+            and self.config.dump
+            and self.current_request_id
+            and self.current_request_id in self.recorder_map
+        ):
             self.ten_env.log_info(
-                f"KEYPOINT Writing audio chunk to dump file, dump file: {self.pcm_dump_file}"
+                f"KEYPOINT Writing audio chunk to dump file, dump path: {self.config.dump_path}, request_id: {self.current_request_id}"
             )
-            asyncio.create_task(self.recorder.write(audio_chunk))
+            asyncio.create_task(
+                self.recorder_map[self.current_request_id].write(audio_chunk)
+            )
