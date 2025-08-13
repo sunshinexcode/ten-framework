@@ -62,7 +62,7 @@ from .realtime.struct import (
 
 @dataclass
 class StepFunRealtimeConfig(BaseConfig):
-    base_uri: str = "wss://api.stepfun.com"
+    base_url: str = "wss://api.stepfun.com"
     api_key: str = ""
     path: str = "/v1/realtime"
     model: str = "step-1o-audio"
@@ -82,7 +82,6 @@ class StepFunRealtimeConfig(BaseConfig):
     vad_prefix_padding_ms: int = 300
     vad_silence_duration_ms: int = 500
 
-    vendor: str = ""
     dump: bool = False
     dump_path: str = ""
 
@@ -136,6 +135,12 @@ class StepFunRealtime2Extension(AsyncMLLMBaseExtension):
     def input_audio_sample_rate(self) -> int:
         return self.config.sample_rate
 
+    def synthesize_audio_sample_rate(self) -> int:
+        return self.config.sample_rate
+
+    def vendor(self) -> str:
+        return "stepfun"
+
     async def start_connection(self) -> None:
         try:
             self.conn = RealtimeApiConnection(
@@ -148,9 +153,8 @@ class StepFunRealtime2Extension(AsyncMLLMBaseExtension):
             )
 
             await self.conn.connect()
-            item_id = ""         # For truncate tracking
+            item_id = ""  # For truncate tracking
             response_id = ""
-            content_index = 0
             flushed: set[str] = set()
             session_start_ms = int(time.time() * 1000)
 
@@ -160,15 +164,21 @@ class StepFunRealtime2Extension(AsyncMLLMBaseExtension):
                     match message:
                         # ----- session lifecycle -----
                         case SessionCreated():
-                            self.ten_env.log_info(f"Session created: {message.session}")
+                            self.ten_env.log_info(
+                                f"Session created: {message.session}"
+                            )
                             self.connected = True
                             self.session_id = message.session.id
                             self.session = message.session
                             await self._update_session()
                             await self._resume_context(self.message_context)
                         case SessionUpdated():
-                            self.ten_env.log_info(f"Session updated: {message.session}")
-                            await self.send_server_session_ready(MLLMServerSessionReady())
+                            self.ten_env.log_info(
+                                f"Session updated: {message.session}"
+                            )
+                            await self.send_server_session_ready(
+                                MLLMServerSessionReady()
+                            )
 
                         # ----- input speech transcription (user) -----
                         case ItemInputAudioTranscriptionDelta():
@@ -181,7 +191,9 @@ class StepFunRealtime2Extension(AsyncMLLMBaseExtension):
                                     content=self.request_transcript,
                                     delta=message.delta,
                                     final=False,
-                                    metadata={"session_id": self.session_id or "-1"},
+                                    metadata={
+                                        "session_id": self.session_id or "-1"
+                                    },
                                 )
                             )
                         case ItemInputAudioTranscriptionCompleted():
@@ -193,7 +205,9 @@ class StepFunRealtime2Extension(AsyncMLLMBaseExtension):
                                     content=self.request_transcript,
                                     delta=message.transcript,
                                     final=True,
-                                    metadata={"session_id": self.session_id or "-1"},
+                                    metadata={
+                                        "session_id": self.session_id or "-1"
+                                    },
                                 )
                             )
                             self.request_transcript = ""
@@ -205,10 +219,14 @@ class StepFunRealtime2Extension(AsyncMLLMBaseExtension):
 
                         # ----- output content events (assistant) -----
                         case ItemCreated():
-                            self.ten_env.log_debug(f"Item created {message.item}")
+                            self.ten_env.log_debug(
+                                f"Item created {message.item}"
+                            )
                         case ResponseCreated():
                             response_id = message.response.id
-                            self.ten_env.log_debug(f"Resp created {response_id}")
+                            self.ten_env.log_debug(
+                                f"Resp created {response_id}"
+                            )
                         case ResponseDone():
                             rid = message.response.id
                             status = message.response.status
@@ -237,7 +255,9 @@ class StepFunRealtime2Extension(AsyncMLLMBaseExtension):
                                     content=self.response_transcript,
                                     delta=message.delta,
                                     final=False,
-                                    metadata={"session_id": self.session_id or "-1"},
+                                    metadata={
+                                        "session_id": self.session_id or "-1"
+                                    },
                                 )
                             )
                         case ResponseTextDone():
@@ -254,7 +274,9 @@ class StepFunRealtime2Extension(AsyncMLLMBaseExtension):
                                     content=self.response_transcript,
                                     delta="",
                                     final=True,
-                                    metadata={"session_id": self.session_id or "-1"},
+                                    metadata={
+                                        "session_id": self.session_id or "-1"
+                                    },
                                 )
                             )
                             self.response_transcript = ""
@@ -275,7 +297,9 @@ class StepFunRealtime2Extension(AsyncMLLMBaseExtension):
                                     content=self.response_transcript,
                                     delta=message.delta,
                                     final=False,
-                                    metadata={"session_id": self.session_id or "-1"},
+                                    metadata={
+                                        "session_id": self.session_id or "-1"
+                                    },
                                 )
                             )
                         case ResponseAudioTranscriptDone():
@@ -292,7 +316,9 @@ class StepFunRealtime2Extension(AsyncMLLMBaseExtension):
                                     content=self.response_transcript,
                                     delta="",
                                     final=True,
-                                    metadata={"session_id": self.session_id or "-1"},
+                                    metadata={
+                                        "session_id": self.session_id or "-1"
+                                    },
                                 )
                             )
                             self.response_transcript = ""
@@ -306,7 +332,6 @@ class StepFunRealtime2Extension(AsyncMLLMBaseExtension):
                                 continue
                             if item_id != message.item_id:
                                 item_id = message.item_id
-                            content_index = message.content_index
                             audio_data = base64.b64decode(message.delta)
                             await self.send_server_output_audio_data(audio_data)
                         case ResponseAudioDone():
@@ -318,19 +343,26 @@ class StepFunRealtime2Extension(AsyncMLLMBaseExtension):
                                 f"Server listening, in response {response_id}, last item {item_id}"
                             )
                             # compute relative end time (ms) since session start
-                            current_ms = int(time.time() * 1000)
-                            end_ms = current_ms - session_start_ms
+                            # current_ms = int(time.time() * 1000)
+                            # end_ms = current_ms - session_start_ms
                             # (optional) truncate on-going generation by item_id/content_index if supported
                             if self.config.server_vad:
-                                await self.send_server_interrupted(sos=MLLMServerInterrupt())
+                                await self.send_server_interrupted(
+                                    sos=MLLMServerInterrupt()
+                                )
                             if response_id and self.response_transcript:
-                                transcript = self.response_transcript + "[interrupted]"
+                                transcript = (
+                                    self.response_transcript + "[interrupted]"
+                                )
                                 await self.send_server_output_text(
                                     MLLMServerOutputTranscript(
                                         content=transcript,
                                         delta=None,
                                         final=True,
-                                        metadata={"session_id": self.session_id or "-1"},
+                                        metadata={
+                                            "session_id": self.session_id
+                                            or "-1"
+                                        },
                                     )
                                 )
                                 self.response_transcript = ""
@@ -339,7 +371,9 @@ class StepFunRealtime2Extension(AsyncMLLMBaseExtension):
                         case InputAudioBufferSpeechStopped():
                             # only meaningful when server_vad is on
                             # shift session_start_ms to keep relative timing aligned with provider
-                            session_start_ms = int(time.time() * 1000) - message.audio_end_ms
+                            session_start_ms = (
+                                int(time.time() * 1000) - message.audio_end_ms
+                            )
                             self.ten_env.log_info(
                                 f"Server stop listening, audio_end_ms={message.audio_end_ms}, session_start_ms={session_start_ms}"
                             )
@@ -351,24 +385,34 @@ class StepFunRealtime2Extension(AsyncMLLMBaseExtension):
                             arguments = message.arguments
                             self.ten_env.log_info(f"need to call func {name}")
                             self.loop.create_task(
-                                self._handle_tool_call(tool_call_id, name, arguments)
+                                self._handle_tool_call(
+                                    tool_call_id, name, arguments
+                                )
                             )
 
                         # misc
                         case ResponseOutputItemDone():
-                            self.ten_env.log_debug(f"Output item done {message.item}")
+                            self.ten_env.log_debug(
+                                f"Output item done {message.item}"
+                            )
                         case ResponseOutputItemAdded():
                             self.ten_env.log_debug(
                                 f"Output item added {message.output_index} {message.item}"
                             )
                         case ErrorMessage():
-                            self.ten_env.log_error(f"Error message received: {message.error}")
+                            self.ten_env.log_error(
+                                f"Error message received: {message.error}"
+                            )
                         case _:
-                            self.ten_env.log_debug(f"Not handled message {message}")
+                            self.ten_env.log_debug(
+                                f"Not handled message {message}"
+                            )
 
                 except Exception as e:
                     traceback.print_exc()
-                    self.ten_env.log_error(f"Error processing message: {message} {e}")
+                    self.ten_env.log_error(
+                        f"Error processing message: {message} {e}"
+                    )
 
             self.ten_env.log_info("Client loop finished")
         except Exception as e:
@@ -394,7 +438,9 @@ class StepFunRealtime2Extension(AsyncMLLMBaseExtension):
 
     # ---------- Client → Provider (ingress) ----------
 
-    async def send_audio(self, frame: AudioFrame, session_id: str | None) -> bool:
+    async def send_audio(
+        self, frame: AudioFrame, session_id: str | None
+    ) -> bool:
         self.session_id = session_id
         await self.conn.send_audio_data(frame.get_buf())
         return True
@@ -410,7 +456,12 @@ class StepFunRealtime2Extension(AsyncMLLMBaseExtension):
                 await self.conn.send_request(
                     ItemCreate(
                         item=UserMessageItemParam(
-                            content=[{"type": ContentType.InputText, "text": item.content}]
+                            content=[
+                                {
+                                    "type": ContentType.InputText,
+                                    "text": item.content,
+                                }
+                            ]
                         )
                     )
                 )
@@ -418,14 +469,18 @@ class StepFunRealtime2Extension(AsyncMLLMBaseExtension):
                 await self.conn.send_request(
                     ItemCreate(
                         item=AssistantMessageItemParam(
-                            content=[{"type": ContentType.Text, "text": item.content}]
+                            content=[
+                                {"type": ContentType.Text, "text": item.content}
+                            ]
                         )
                     )
                 )
             case _:
                 self.ten_env.log_error(f"Unknown role: {item.role}")
 
-    async def send_client_create_response(self, session_id: str | None = None) -> None:
+    async def send_client_create_response(
+        self, session_id: str | None = None
+    ) -> None:
         """Trigger the model to generate."""
         await self.conn.send_request(ResponseCreate())
 
@@ -450,7 +505,9 @@ class StepFunRealtime2Extension(AsyncMLLMBaseExtension):
             )
         )
 
-    async def _resume_context(self, messages: list[MLLMClientMessageItem]) -> None:
+    async def _resume_context(
+        self, messages: list[MLLMClientMessageItem]
+    ) -> None:
         """Replay preserved messages into current session."""
         for message in messages:
             self.ten_env.log_info(f"Resuming context with message: {message}")
@@ -490,6 +547,7 @@ class StepFunRealtime2Extension(AsyncMLLMBaseExtension):
             tools = [tool_dict(t) for t in self.available_tools]
 
         # VAD params
+        vad_params = None
         if self.config.vad_type == "server_vad":
             vad_params = ServerVADUpdateParams(
                 threshold=self.config.vad_threshold,
@@ -522,8 +580,12 @@ class StepFunRealtime2Extension(AsyncMLLMBaseExtension):
 
     # ---------- Tool call bridging ----------
 
-    async def _handle_tool_call(self, tool_call_id: str, name: str, arguments: str) -> None:
-        self.ten_env.log_info(f"_handle_tool_call {tool_call_id} {name} {arguments}")
+    async def _handle_tool_call(
+        self, tool_call_id: str, name: str, arguments: str
+    ) -> None:
+        self.ten_env.log_info(
+            f"_handle_tool_call {tool_call_id} {name} {arguments}"
+        )
         await self.send_server_function_call(
             MLLMServerFunctionCall(
                 call_id=tool_call_id,

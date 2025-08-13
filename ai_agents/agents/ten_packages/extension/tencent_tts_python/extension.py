@@ -13,7 +13,6 @@ from ten_ai_base.message import (
     ModuleError,
     ModuleErrorCode,
     ModuleErrorVendorInfo,
-    ModuleType,
     ModuleVendorException,
 )
 from ten_ai_base.struct import TTSTextInput

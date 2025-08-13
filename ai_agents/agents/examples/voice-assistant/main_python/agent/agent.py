@@ -5,13 +5,16 @@ from ten_runtime import AsyncTenEnv, Cmd, CmdResult, Data, StatusCode
 from ten_ai_base.types import LLMToolMetadata
 from .events import *
 
+
 class Agent:
     def __init__(self, ten_env: AsyncTenEnv):
         self.ten_env: AsyncTenEnv = ten_env
         self.stopped = False
         self.event_queue: asyncio.Queue[AgentEvent] = asyncio.Queue()
         self.llm_exec = LLMExec(ten_env)
-        self.llm_exec.on_response = self._on_llm_response  # callback handled internally
+        self.llm_exec.on_response = (
+            self._on_llm_response
+        )  # callback handled internally
 
     async def on_cmd(self, cmd: Cmd):
         cmd_name = cmd.get_name()
@@ -25,17 +28,23 @@ class Agent:
                 if err:
                     raise RuntimeError(f"Invalid tool metadata: {err}")
                 tool = LLMToolMetadata.model_validate_json(tool_json)
-                event = ToolRegisterEvent(tool=tool, source=cmd.get_source().extension_name)
+                event = ToolRegisterEvent(
+                    tool=tool, source=cmd.get_source().extension_name
+                )
             else:
                 self.ten_env.log_warn(f"Unhandled cmd: {cmd_name}")
                 return
 
             await self.event_queue.put(event)
-            await self.ten_env.return_result(CmdResult.create(StatusCode.OK, cmd))
+            await self.ten_env.return_result(
+                CmdResult.create(StatusCode.OK, cmd)
+            )
 
         except Exception as e:
             self.ten_env.log_error(f"on_cmd error: {e}")
-            await self.ten_env.return_result(CmdResult.create(StatusCode.ERROR, cmd))
+            await self.ten_env.return_result(
+                CmdResult.create(StatusCode.ERROR, cmd)
+            )
 
     async def on_data(self, data: Data):
         data_name = data.get_name()
@@ -57,7 +66,6 @@ class Agent:
 
     async def get_event(self) -> AgentEvent:
         return await self.event_queue.get()
-
 
     async def register_llm_tool(self, tool: LLMToolMetadata, source: str):
         """
@@ -89,7 +97,9 @@ class Agent:
         await self.llm_exec.stop()
         await self.event_queue.put(None)
 
-    async def _on_llm_response(self, ten_env: AsyncTenEnv, delta: str, text: str, is_final: bool):
+    async def _on_llm_response(
+        self, ten_env: AsyncTenEnv, delta: str, text: str, is_final: bool
+    ):
         """
         Internal callback for streaming LLM output, wrapped as an AgentEvent.
         """

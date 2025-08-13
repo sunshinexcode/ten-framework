@@ -41,7 +41,6 @@ class MinimaxTTSWebsocketConfig(BaseModel):
     params: Dict[str, Any] = Field(default_factory=dict)
     black_list_params: List[str] = Field(default_factory=list)
 
-
     def is_black_list_params(self, key: str) -> bool:
         return key in self.black_list_params
 

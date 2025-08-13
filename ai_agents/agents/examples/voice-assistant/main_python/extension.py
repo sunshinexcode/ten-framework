@@ -36,7 +36,7 @@ class MainControlExtension(AsyncExtension):
 
         self.stopped: bool = False
         self._rtc_user_count: int = 0
-        self.current_metadata: dict = { "session_id": "0", "turn_id": -1 }
+        self.current_metadata: dict = {"session_id": "0", "turn_id": -1}
         self.sentence_fragment: str = ""
 
     async def on_init(self, ten_env: AsyncTenEnv):
@@ -78,7 +78,9 @@ class MainControlExtension(AsyncExtension):
                     case UserJoinedEvent():
                         self._rtc_user_count += 1
                         if self._rtc_user_count == 1 and self.config.greeting:
-                            await self._send_to_tts(self.config.greeting, is_final=True)
+                            await self._send_to_tts(
+                                self.config.greeting, is_final=True
+                            )
                             await self._send_transcript(
                                 role="assistant",
                                 text=self.config.greeting,
@@ -97,13 +99,17 @@ class MainControlExtension(AsyncExtension):
 
                     case ASRResultEvent():
                         self.current_metadata = {
-                            "session_id": event.metadata.get("session_id", "100"),
+                            "session_id": event.metadata.get(
+                                "session_id", "100"
+                            ),
                             "turn_id": event.metadata.get("turn_id", -1),
                         }
                         stream_id = int(event.metadata.get("session_id", "100"))
 
                         if event.text == "":
-                            self.ten_env.log_info("[MainControlExtension] Empty ASR result, skipping")
+                            self.ten_env.log_info(
+                                "[MainControlExtension] Empty ASR result, skipping"
+                            )
                             continue
 
                         if event.final or len(event.text) > 2:
@@ -126,7 +132,9 @@ class MainControlExtension(AsyncExtension):
                                 self.sentence_fragment, event.delta
                             )
                             for sentence in sentences:
-                                await self._send_to_tts(sentence, is_final=False)
+                                await self._send_to_tts(
+                                    sentence, is_final=False
+                                )
 
                         await self._send_transcript(
                             role="assistant",
@@ -135,12 +143,18 @@ class MainControlExtension(AsyncExtension):
                             stream_id=100,
                         )
                     case _:
-                        self.ten_env.log_warn(f"[MainControlExtension] Unhandled event: {event}")
+                        self.ten_env.log_warn(
+                            f"[MainControlExtension] Unhandled event: {event}"
+                        )
 
             except Exception as e:
-                self.ten_env.log_error(f"[MainControlExtension] Event processing error: {e}")
+                self.ten_env.log_error(
+                    f"[MainControlExtension] Event processing error: {e}"
+                )
 
-    async def _send_transcript(self, role: str, text: str, final: bool, stream_id: int):
+    async def _send_transcript(
+        self, role: str, text: str, final: bool, stream_id: int
+    ):
         """
         Sends the transcript (ASR or LLM output) to the message collector.
         """
@@ -157,7 +171,9 @@ class MainControlExtension(AsyncExtension):
                 "stream_id": stream_id,
             },
         )
-        self.ten_env.log_info(f"[MainControlExtension] Sent transcript: {role}, final={final}, text={text}")
+        self.ten_env.log_info(
+            f"[MainControlExtension] Sent transcript: {role}, final={final}, text={text}"
+        )
 
     async def _send_to_tts(self, text: str, is_final: bool):
         """
@@ -175,7 +191,9 @@ class MainControlExtension(AsyncExtension):
                 "metadata": self.current_metadata,
             },
         )
-        self.ten_env.log_info(f"[MainControlExtension] Sent to TTS: is_final={is_final}, text={text}")
+        self.ten_env.log_info(
+            f"[MainControlExtension] Sent to TTS: is_final={is_final}, text={text}"
+        )
 
     async def _interrupt(self):
         """

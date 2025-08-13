@@ -74,7 +74,9 @@ class AzureRealtimeConfig(BaseConfig):
     base_uri: str = ""
     api_key: str = ""
     path: str = "/voice-live/realtime"
-    model: str = "gpt-4o"  # supports both gpt-4o(-mini)-realtime-* or chat models
+    model: str = (
+        "gpt-4o"  # supports both gpt-4o(-mini)-realtime-* or chat models
+    )
     api_version: str = "2025-05-01-preview"
     language: str = "en-US"
     prompt: str = ""
@@ -89,7 +91,9 @@ class AzureRealtimeConfig(BaseConfig):
 
     # Output & VAD
     audio_out: bool = True
-    server_vad: bool = True  # for gpt-4o-realtime* models; otherwise Azure semantic VAD is used
+    server_vad: bool = (
+        True  # for gpt-4o-realtime* models; otherwise Azure semantic VAD is used
+    )
     sample_rate: int = 24000
 
     # Transcription (input ASR)
@@ -100,7 +104,7 @@ class AzureRealtimeConfig(BaseConfig):
     input_audio_echo_cancellation: bool = False
 
     # Misc
-    vendor: str = ""          # parity with OpenAI impl (not used by Azure)
+    vendor: str = ""  # parity with OpenAI impl (not used by Azure)
     dump: bool = False
     dump_path: str = ""
 
@@ -149,7 +153,13 @@ class AzureRealtime2Extension(AsyncMLLMBaseExtension):
         if self.conn:
             await self.conn.close()
 
+    def vendor(self) -> str:
+        return "azure"
+
     def input_audio_sample_rate(self) -> int:
+        return self.config.sample_rate
+
+    def synthesize_audio_sample_rate(self) -> int:
         return self.config.sample_rate
 
     async def start_connection(self) -> None:
@@ -166,7 +176,6 @@ class AzureRealtime2Extension(AsyncMLLMBaseExtension):
 
             item_id = ""
             response_id = ""
-            content_index = 0
             flushed: set[str] = set()
             session_start_ms = int(time.time() * 1000)
 
@@ -178,55 +187,75 @@ class AzureRealtime2Extension(AsyncMLLMBaseExtension):
                         case SessionCreated():
                             self.connected = True
                             self.session_id = message.session.id
-                            self.ten_env.log_info(f"[Azure] session created: {self.session_id}")
+                            self.ten_env.log_info(
+                                f"[Azure] session created: {self.session_id}"
+                            )
                             await self._update_session()
                             await self._resume_context(self.message_context)
 
                         case SessionUpdated():
                             self.ten_env.log_info("[Azure] session updated")
-                            await self.send_server_session_ready(MLLMServerSessionReady())
+                            await self.send_server_session_ready(
+                                MLLMServerSessionReady()
+                            )
 
                         # ---- input (user ASR) ----
                         case ItemInputAudioTranscriptionDelta():
-                            self.ten_env.log_info(f"[Azure] input transcription delta: {message}")
+                            self.ten_env.log_info(
+                                f"[Azure] input transcription delta: {message}"
+                            )
                             self.request_transcript += message.delta or ""
                             await self.send_server_input_transcript(
                                 MLLMServerInputTranscript(
                                     content=self.request_transcript,
                                     delta=message.delta or "",
                                     final=False,
-                                    metadata={"session_id": self.session_id or "-1"},
+                                    metadata={
+                                        "session_id": self.session_id or "-1"
+                                    },
                                 )
                             )
                         case ItemInputAudioTranscriptionCompleted():
-                            self.ten_env.log_info(f"[Azure] input transcription completed: {message}")
+                            self.ten_env.log_info(
+                                f"[Azure] input transcription completed: {message}"
+                            )
                             await self.send_server_input_transcript(
                                 MLLMServerInputTranscript(
                                     content=message.transcript,
                                     delta="",
                                     final=True,
-                                    metadata={"session_id": self.session_id or "-1"},
+                                    metadata={
+                                        "session_id": self.session_id or "-1"
+                                    },
                                 )
                             )
                             self.request_transcript = ""
                         case ItemInputAudioTranscriptionFailed():
-                            self.ten_env.log_warn(f"[Azure] input transcription failed: {message.error}")
+                            self.ten_env.log_warn(
+                                f"[Azure] input transcription failed: {message.error}"
+                            )
                             self.request_transcript = ""
 
                         case ItemCreated():
-                            self.ten_env.log_debug(f"[Azure] item created: {message.item}")
+                            self.ten_env.log_debug(
+                                f"[Azure] item created: {message.item}"
+                            )
 
                         # ---- response lifecycle ----
                         case ResponseCreated():
                             response_id = message.response.id
-                            self.ten_env.log_debug(f"[Azure] response created: {response_id}")
+                            self.ten_env.log_debug(
+                                f"[Azure] response created: {response_id}"
+                            )
 
                         case ResponseDone():
                             rid = message.response.id
                             status = message.response.status
                             if rid == response_id:
                                 response_id = ""
-                            self.ten_env.log_debug(f"[Azure] response done {rid} status={status} usage={message.response.usage}")
+                            self.ten_env.log_debug(
+                                f"[Azure] response done {rid} status={status} usage={message.response.usage}"
+                            )
 
                         # ---- assistant streaming text/ASR ----
                         case ResponseAudioTranscriptDelta():
@@ -238,7 +267,9 @@ class AzureRealtime2Extension(AsyncMLLMBaseExtension):
                                     content=self.response_transcript,
                                     delta=message.delta or "",
                                     final=False,
-                                    metadata={"session_id": self.session_id or "-1"},
+                                    metadata={
+                                        "session_id": self.session_id or "-1"
+                                    },
                                 )
                             )
                         case ResponseTextDelta():
@@ -252,7 +283,9 @@ class AzureRealtime2Extension(AsyncMLLMBaseExtension):
                                     content=self.response_transcript,
                                     delta=message.delta or "",
                                     final=False,
-                                    metadata={"session_id": self.session_id or "-1"},
+                                    metadata={
+                                        "session_id": self.session_id or "-1"
+                                    },
                                 )
                             )
 
@@ -264,7 +297,9 @@ class AzureRealtime2Extension(AsyncMLLMBaseExtension):
                                     content=self.response_transcript,
                                     delta="",
                                     final=True,
-                                    metadata={"session_id": self.session_id or "-1"},
+                                    metadata={
+                                        "session_id": self.session_id or "-1"
+                                    },
                                 )
                             )
                             self.response_transcript = ""
@@ -277,7 +312,9 @@ class AzureRealtime2Extension(AsyncMLLMBaseExtension):
                                     content=self.response_transcript,
                                     delta="",
                                     final=True,
-                                    metadata={"session_id": self.session_id or "-1"},
+                                    metadata={
+                                        "session_id": self.session_id or "-1"
+                                    },
                                 )
                             )
                             self.response_transcript = ""
@@ -288,35 +325,49 @@ class AzureRealtime2Extension(AsyncMLLMBaseExtension):
                                 continue
                             if item_id != message.item_id:
                                 item_id = message.item_id
-                            content_index = message.content_index
                             audio_bytes = base64.b64decode(message.delta)
-                            await self.send_server_output_audio_data(audio_bytes)
+                            await self.send_server_output_audio_data(
+                                audio_bytes
+                            )
 
                         case ResponseAudioDone():
                             # nothing special; text/audio done events above already finalize segments
                             pass
 
                         case ResponseOutputItemAdded():
-                            self.ten_env.log_debug(f"[Azure] output item added idx={message.output_index} item={message.item}")
+                            self.ten_env.log_debug(
+                                f"[Azure] output item added idx={message.output_index} item={message.item}"
+                            )
                         case ResponseOutputItemDone():
-                            self.ten_env.log_debug(f"[Azure] output item done {message.item}")
+                            self.ten_env.log_debug(
+                                f"[Azure] output item done {message.item}"
+                            )
 
                         # ---- VAD notifications from server ----
                         case InputAudioBufferSpeechStarted():
-                            self.ten_env.log_info(f"[Azure] server VAD: speech started in response {response_id}, last item {item_id}")
+                            self.ten_env.log_info(
+                                f"[Azure] server VAD: speech started in response {response_id}, last item {item_id}"
+                            )
                             # recompute relative timing for truncation if needed
                             current_ms = int(time.time() * 1000)
                             _ = current_ms - session_start_ms
                             if self.config.server_vad:
-                                await self.send_server_interrupted(sos=MLLMServerInterrupt())
+                                await self.send_server_interrupted(
+                                    sos=MLLMServerInterrupt()
+                                )
                             if response_id and self.response_transcript:
-                                transcript = self.response_transcript + "[interrupted]"
+                                transcript = (
+                                    self.response_transcript + "[interrupted]"
+                                )
                                 await self.send_server_output_text(
                                     MLLMServerOutputTranscript(
                                         content=transcript,
                                         delta=None,
                                         final=True,
-                                        metadata={"session_id": self.session_id or "-1"},
+                                        metadata={
+                                            "session_id": self.session_id
+                                            or "-1"
+                                        },
                                     )
                                 )
                                 self.response_transcript = ""
@@ -325,12 +376,18 @@ class AzureRealtime2Extension(AsyncMLLMBaseExtension):
 
                         case InputAudioBufferSpeechStopped():
                             # update base time using server-reported end offset for later truncate if needed
-                            session_start_ms = int(time.time() * 1000) - message.audio_end_ms
-                            self.ten_env.log_info(f"[Azure] server VAD: speech stopped, audio_end_ms={message.audio_end_ms}")
+                            session_start_ms = (
+                                int(time.time() * 1000) - message.audio_end_ms
+                            )
+                            self.ten_env.log_info(
+                                f"[Azure] server VAD: speech stopped, audio_end_ms={message.audio_end_ms}"
+                            )
 
                         # ---- tool call ----
                         case ResponseFunctionCallArgumentsDone():
-                            self.ten_env.log_info(f"[Azure] tool call requested: {message.name}")
+                            self.ten_env.log_info(
+                                f"[Azure] tool call requested: {message.name}"
+                            )
                             # forward to host; host will reply via send_client_function_call_output
                             await self.send_server_function_call(
                                 MLLMServerFunctionCall(
@@ -342,14 +399,20 @@ class AzureRealtime2Extension(AsyncMLLMBaseExtension):
 
                         # ---- errors ----
                         case ErrorMessage():
-                            self.ten_env.log_error(f"[Azure] error: {message.error}")
+                            self.ten_env.log_error(
+                                f"[Azure] error: {message.error}"
+                            )
 
                         case _:
-                            self.ten_env.log_debug(f"[Azure] unhandled message: {message}")
+                            self.ten_env.log_debug(
+                                f"[Azure] unhandled message: {message}"
+                            )
 
                 except Exception as e:
                     traceback.print_exc()
-                    self.ten_env.log_error(f"[Azure] error processing message {message}: {e}")
+                    self.ten_env.log_error(
+                        f"[Azure] error processing message {message}: {e}"
+                    )
 
             self.ten_env.log_info("[Azure] client loop finished")
         except Exception as e:
@@ -376,7 +439,9 @@ class AzureRealtime2Extension(AsyncMLLMBaseExtension):
 
     # ---------- client → provider ----------
 
-    async def send_audio(self, frame: AudioFrame, session_id: str | None) -> bool:
+    async def send_audio(
+        self, frame: AudioFrame, session_id: str | None
+    ) -> bool:
         self.session_id = session_id
         if not self.conn:
             return False
@@ -386,7 +451,9 @@ class AzureRealtime2Extension(AsyncMLLMBaseExtension):
     async def on_data(self, ten_env: AsyncTenEnv, data: Data) -> None:
         await super().on_data(ten_env, data)
 
-    async def send_client_message_item(self, item: MLLMClientMessageItem, session_id: str | None = None) -> None:
+    async def send_client_message_item(
+        self, item: MLLMClientMessageItem, session_id: str | None = None
+    ) -> None:
         if not self.conn:
             return
         match item.role:
@@ -394,7 +461,12 @@ class AzureRealtime2Extension(AsyncMLLMBaseExtension):
                 await self.conn.send_request(
                     ItemCreate(
                         item=UserMessageItemParam(
-                            content=[{"type": ContentType.InputText, "text": item.content or ""}]
+                            content=[
+                                {
+                                    "type": ContentType.InputText,
+                                    "text": item.content or "",
+                                }
+                            ]
                         )
                     )
                 )
@@ -402,14 +474,21 @@ class AzureRealtime2Extension(AsyncMLLMBaseExtension):
                 await self.conn.send_request(
                     ItemCreate(
                         item=AssistantMessageItemParam(
-                            content=[{"type": ContentType.Text, "text": item.content or ""}]
+                            content=[
+                                {
+                                    "type": ContentType.Text,
+                                    "text": item.content or "",
+                                }
+                            ]
                         )
                     )
                 )
             case _:
                 self.ten_env.log_error(f"[Azure] unknown role: {item.role}")
 
-    async def send_client_create_response(self, session_id: str | None = None) -> None:
+    async def send_client_create_response(
+        self, session_id: str | None = None
+    ) -> None:
         if not self.conn:
             return
         await self.conn.send_request(ResponseCreate())
@@ -418,7 +497,9 @@ class AzureRealtime2Extension(AsyncMLLMBaseExtension):
         self.available_tools.append(tool)
         await self._update_session()
 
-    async def send_client_function_call_output(self, function_call_output: MLLMClientFunctionCallOutput) -> None:
+    async def send_client_function_call_output(
+        self, function_call_output: MLLMClientFunctionCallOutput
+    ) -> None:
         # Azure expects tool result as an item with FunctionCallOutputItemParam, then create a response.
         if not self.conn:
             return
@@ -432,7 +513,9 @@ class AzureRealtime2Extension(AsyncMLLMBaseExtension):
         )
         await self.conn.send_request(ResponseCreate())
 
-    async def _resume_context(self, messages: list[MLLMClientMessageItem]) -> None:
+    async def _resume_context(
+        self, messages: list[MLLMClientMessageItem]
+    ) -> None:
         for m in messages:
             try:
                 await self.send_client_message_item(m)
@@ -467,13 +550,22 @@ class AzureRealtime2Extension(AsyncMLLMBaseExtension):
                     t["parameters"]["required"].append(p.name)
             return t
 
-        tools = [tool_dict(t) for t in self.available_tools] if self.available_tools else []
+        tools = (
+            [tool_dict(t) for t in self.available_tools]
+            if self.available_tools
+            else []
+        )
         prompt = self.config.prompt
 
         # Default: use Azure semantic VAD for non-realtime chat models,
         # and server VAD for gpt-4o-realtime* models.
-        if self.config.model in ("gpt-4o-realtime-preview", "gpt-4o-mini-realtime-preview"):
-            vad_params = ServerVADUpdateParams() if self.config.server_vad else None
+        if self.config.model in (
+            "gpt-4o-realtime-preview",
+            "gpt-4o-mini-realtime-preview",
+        ):
+            vad_params = (
+                ServerVADUpdateParams() if self.config.server_vad else None
+            )
         else:
             vad_params = AzureSemanticVadUpdateParams()
 
@@ -485,10 +577,14 @@ class AzureRealtime2Extension(AsyncMLLMBaseExtension):
                 tools=tools,
                 turn_detection=vad_params,
                 input_audio_noise_reduction=(
-                    AzureInputAudioNoiseReduction() if self.config.input_audio_noise_reduction else None
+                    AzureInputAudioNoiseReduction()
+                    if self.config.input_audio_noise_reduction
+                    else None
                 ),
                 input_audio_echo_cancellation=(
-                    AzureInputAudioEchoCancellation() if self.config.input_audio_echo_cancellation else None
+                    AzureInputAudioEchoCancellation()
+                    if self.config.input_audio_echo_cancellation
+                    else None
                 ),
             )
         )
@@ -506,9 +602,14 @@ class AzureRealtime2Extension(AsyncMLLMBaseExtension):
 
         # input transcription
         if self.config.input_transcript:
-            if self.config.model in ("gpt-4o-realtime-preview", "gpt-4o-mini-realtime-preview"):
+            if self.config.model in (
+                "gpt-4o-realtime-preview",
+                "gpt-4o-mini-realtime-preview",
+            ):
                 su.session.input_audio_transcription = InputAudioTranscription()
             else:
-                su.session.input_audio_transcription = AzureInputAudioTranscription()
+                su.session.input_audio_transcription = (
+                    AzureInputAudioTranscription()
+                )
 
         await self.conn.send_request(su)
