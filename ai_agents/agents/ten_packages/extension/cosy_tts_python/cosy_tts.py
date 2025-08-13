@@ -130,9 +130,7 @@ class CosyTTSClient:
         """Start the TTS client and initialize components."""
         # Initialize audio data queue
         self._receive_queue = asyncio.Queue()
-        self._callback = AsyncIteratorCallback(
-            self.ten_env, self._receive_queue
-        )
+        self._callback = AsyncIteratorCallback(self.ten_env, self._receive_queue)
 
         # Create synthesizer with configuration
         self.synthesizer = SpeechSynthesizer(
@@ -169,7 +167,9 @@ class CosyTTSClient:
         self.stopping = True
         # Cancel any ongoing synthesis
         await self.cancel()
-        self.ten_env.log_info("Cosy TTS client closed successfully")
+        self.ten_env.log_info(
+            f"Cosy TTS client closed successfully, stopping: {self.stopping}"
+        )
 
     async def complete(self) -> None:
         """
@@ -201,11 +201,15 @@ class CosyTTSClient:
             # Start streaming TTS synthesis
             self.synthesizer.streaming_call(text)
 
+            # Complete streaming
+            if text_input_end:
+                await self.complete()
+
             # Process audio chunks from queue
             while not self.stopping:
                 try:
-                    # Wait for data with timeout
                     if self._receive_queue is None:
+                        self.ten_env.log_error("TTS receive queue is not initialized")
                         break
 
                     done, message_type, data = await asyncio.wait_for(
@@ -217,15 +221,17 @@ class CosyTTSClient:
 
                     # If done, break the loop
                     if done:
+                        self.ten_env.log_info(
+                            f"TTS synthesis completed: duration={self._duration_in_ms_since(start_time)}ms"
+                        )
                         break
 
                 except asyncio.TimeoutError:
-                    self.ten_env.log_warn("Timeout waiting for TTS audio data")
+                    self.ten_env.log_warn(
+                        f"Timeout waiting for TTS audio data, stopping: {self.stopping}"
+                    )
+                    # Force exit the loop when timeout occurs to prevent infinite loop
                     break
-
-            # Complete streaming
-            if text_input_end:
-                await self.complete()
 
             self.ten_env.log_info(
                 f"TTS synthesis completed: duration={self._duration_in_ms_since(start_time)}ms"
