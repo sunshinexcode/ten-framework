@@ -9,6 +9,8 @@ import traceback
 from dataclasses import dataclass
 from typing import Literal
 
+from pydantic import BaseModel
+
 from ten_ai_base.mllm import AsyncMLLMBaseExtension
 from ten_ai_base.struct import (
     MLLMClientFunctionCallOutput,
@@ -20,7 +22,6 @@ from ten_ai_base.struct import (
     MLLMServerSessionReady,
 )
 from ten_runtime import AudioFrame, AsyncTenEnv
-from ten_ai_base.config import BaseConfig
 from ten_ai_base.types import LLMToolMetadata
 
 from google import genai
@@ -58,7 +59,7 @@ from google.genai.types import (
 # Config
 # ------------------------------
 @dataclass
-class GeminiRealtimeConfig(BaseConfig):
+class GeminiRealtimeConfig(BaseModel):
     api_key: str = ""
     model: str = "gemini-2.0-flash-live-001"
     language: str = "en-US"
@@ -138,7 +139,8 @@ class GeminiRealtime2Extension(AsyncMLLMBaseExtension):
         self.ten_env = ten_env
         self.loop = asyncio.get_event_loop()
 
-        self.config = await GeminiRealtimeConfig.create_async(ten_env=ten_env)
+        properties, _ = await ten_env.get_property_to_json(None)
+        self.config = GeminiRealtimeConfig.model_validate_json(properties)
         ten_env.log_info(f"config: {self.config}")
 
         if not self.config.api_key:

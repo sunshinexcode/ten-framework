@@ -9,6 +9,8 @@ import time
 import traceback
 from dataclasses import dataclass
 
+from pydantic import BaseModel
+
 from ten_ai_base.mllm import AsyncMLLMBaseExtension
 from ten_ai_base.struct import (
     MLLMClientFunctionCallOutput,
@@ -21,7 +23,6 @@ from ten_ai_base.struct import (
 )
 from ten_runtime import AudioFrame, AsyncTenEnv, Data
 
-from ten_ai_base.config import BaseConfig
 from ten_ai_base.types import LLMToolMetadata
 
 from .realtime.connection import RealtimeApiConnection
@@ -70,8 +71,8 @@ from .realtime.struct import (
 
 
 @dataclass
-class AzureRealtimeConfig(BaseConfig):
-    base_uri: str = ""
+class AzureRealtimeConfig(BaseModel):
+    base_url: str = ""
     api_key: str = ""
     path: str = "/voice-live/realtime"
     model: str = (
@@ -140,12 +141,13 @@ class AzureRealtime2Extension(AsyncMLLMBaseExtension):
         self.ten_env = ten_env
         self.loop = asyncio.get_event_loop()
 
-        self.config = await AzureRealtimeConfig.create_async(ten_env=ten_env)
+        properties, _ = await ten_env.get_property_to_json(None)
+        self.config = AzureRealtimeConfig.model_validate_json(properties)
         ten_env.log_info(f"config: {self.config}")
 
-        if not self.config.api_key or not self.config.base_uri:
-            ten_env.log_error("api_key and base_uri are required")
-            raise ValueError("api_key/base_uri required")
+        if not self.config.api_key or not self.config.base_url:
+            ten_env.log_error("api_key and base_url are required")
+            raise ValueError("api_key/base_url required")
 
     async def on_stop(self, ten_env: AsyncTenEnv) -> None:
         await super().on_stop(ten_env)
@@ -166,7 +168,7 @@ class AzureRealtime2Extension(AsyncMLLMBaseExtension):
         try:
             self.conn = RealtimeApiConnection(
                 ten_env=self.ten_env,
-                base_uri=self.config.base_uri,
+                base_url=self.config.base_url,
                 path=self.config.path,
                 api_key=self.config.api_key,
                 api_version=self.config.api_version,

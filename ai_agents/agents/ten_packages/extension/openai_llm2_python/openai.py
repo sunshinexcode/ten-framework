@@ -66,17 +66,21 @@ class ThinkParser:
         self.state = "NORMAL"  # States: 'NORMAL', 'THINK'
         self.think_content = ""
         self.content = ""
+        self.think_delta = ""
 
     def process(self, new_chars):
         if new_chars == "<think>":
             self.state = "THINK"
+            self.think_delta = ""
             return True
         elif new_chars == "</think>":
             self.state = "NORMAL"
+            self.think_delta = ""
             return True
         else:
             if self.state == "THINK":
                 self.think_content += new_chars
+                self.think_delta = new_chars
         return False
 
     def process_by_reasoning_content(self, reasoning_content):
@@ -86,8 +90,10 @@ class ThinkParser:
                 self.state = "THINK"
                 state_changed = True
             self.think_content += reasoning_content
+            self.think_delta = reasoning_content
         elif self.state == "THINK":
             self.state = "NORMAL"
+            self.think_delta = ""
             state_changed = True
         return state_changed
 
@@ -320,7 +326,7 @@ class OpenAIChatGPT:
                                 response_id=chat_completion.id,
                                 role="assistant",
                                 content=parser.think_content,
-                                delta=parser.think_content,
+                                delta=parser.think_delta,
                                 created=chat_completion.created,
                             )
                         elif parser.state == "NORMAL":
