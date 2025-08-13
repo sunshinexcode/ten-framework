@@ -13,6 +13,7 @@ from ten_ai_base.message import (
     ModuleError,
     ModuleErrorCode,
     ModuleErrorVendorInfo,
+    ModuleType,
     ModuleVendorException,
     TTSAudioEndReason,
 )
