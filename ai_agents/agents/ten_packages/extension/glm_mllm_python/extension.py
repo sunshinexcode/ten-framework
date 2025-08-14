@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Iterable
 
+from pydantic import BaseModel
 from pydub import AudioSegment
 
 from ten_ai_base.mllm import AsyncMLLMBaseExtension
@@ -25,7 +26,6 @@ from ten_ai_base.struct import (
     MLLMServerSessionReady,
 )
 from ten_runtime import AudioFrame, AsyncTenEnv, Data
-from ten_ai_base.config import BaseConfig
 from ten_ai_base.types import LLMToolMetadata, LLMChatCompletionContentPartParam
 
 from .realtime.connection import RealtimeApiConnection
@@ -73,7 +73,7 @@ class Role(str, Enum):
 
 
 @dataclass
-class GLMRealtimeConfig(BaseConfig):
+class GLMRealtimeConfig(BaseModel):
     base_url: str = "wss://open.bigmodel.cn"
     api_key: str = ""
     path: str = "/api/paas/v4/realtime"
@@ -134,7 +134,8 @@ class GLMRealtime2Extension(AsyncMLLMBaseExtension):
         self.ten_env = ten_env
         self.loop = asyncio.get_event_loop()
 
-        self.config = await GLMRealtimeConfig.create_async(ten_env=ten_env)
+        properties, _ = await ten_env.get_property_to_json(None)
+        self.config = GLMRealtimeConfig.model_validate_json(properties)
         ten_env.log_info(f"config: {self.config}")
 
         if not self.config.api_key:
@@ -160,7 +161,7 @@ class GLMRealtime2Extension(AsyncMLLMBaseExtension):
         try:
             self.conn = RealtimeApiConnection(
                 ten_env=self.ten_env,
-                base_uri=self.config.base_uri,
+                base_url=self.config.base_url,
                 path=self.config.path,
                 api_key=self.config.api_key,
             )

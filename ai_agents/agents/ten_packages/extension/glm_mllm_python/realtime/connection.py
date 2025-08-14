@@ -38,13 +38,13 @@ class RealtimeApiConnection:
     def __init__(
         self,
         ten_env: AsyncTenEnv,
-        base_uri: str,
+        base_url: str,
         api_key: str | None = None,
         path: str = "/v1/realtime",
         verbose: bool = False,
     ):
         self.ten_env = ten_env
-        self.url = f"{base_uri}{path}"
+        self.url = f"{base_url}{path}"
         # if not self.vendor and "model=" not in self.url:
         #     self.url += f"?model={model}"
 

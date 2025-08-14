@@ -62,6 +62,8 @@ class TencentTTSExtension(AsyncTTS2BaseExtension):
         # Total audio bytes received for current request
         self.total_audio_bytes: int = 0
 
+        self.request_total_audio_duration: int = 0
+
     async def on_init(self, ten_env: AsyncTenEnv) -> None:
         try:
             await super().on_init(ten_env)

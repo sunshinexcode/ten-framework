@@ -11,6 +11,8 @@ import traceback
 import time
 from typing import Literal
 
+from pydantic import BaseModel
+
 from ten_ai_base.mllm import AsyncMLLMBaseExtension
 from ten_ai_base.struct import (
     MLLMClientFunctionCallOutput,
@@ -27,7 +29,6 @@ from ten_runtime import (
     Data,
 )
 from dataclasses import dataclass
-from ten_ai_base.config import BaseConfig
 from ten_ai_base.types import (
     LLMToolMetadata,
 )
@@ -68,7 +69,7 @@ from .realtime.struct import (
 
 
 @dataclass
-class OpenAIRealtimeConfig(BaseConfig):
+class OpenAIRealtimeConfig(BaseModel):
     base_url: str = "wss://api.openai.com"
     api_key: str = ""
     path: str = "/v1/realtime"
@@ -116,7 +117,8 @@ class OpenAIRealtime2Extension(AsyncMLLMBaseExtension):
 
         self.loop = asyncio.get_event_loop()
 
-        self.config = await OpenAIRealtimeConfig.create_async(ten_env=ten_env)
+        properties, _ = await ten_env.get_property_to_json(None)
+        self.config = OpenAIRealtimeConfig.model_validate_json(properties)
         ten_env.log_info(f"config: {self.config}")
 
         if not self.config.api_key:
@@ -142,7 +144,7 @@ class OpenAIRealtime2Extension(AsyncMLLMBaseExtension):
         try:
             self.conn = RealtimeApiConnection(
                 ten_env=self.ten_env,
-                base_uri=self.config.base_uri,
+                base_url=self.config.base_url,
                 path=self.config.path,
                 api_key=self.config.api_key,
                 model=self.config.model,
@@ -586,7 +588,6 @@ class OpenAIRealtime2Extension(AsyncMLLMBaseExtension):
             tools = [tool_dict(t) for t in self.available_tools]
         prompt = self.config.prompt
 
-        self.ten_env.log_info(f"update session {prompt} {tools}")
         if self.config.vad_type == "server_vad":
             vad_params = ServerVADUpdateParams(
                 threshold=self.config.vad_threshold,
@@ -614,6 +615,8 @@ class OpenAIRealtime2Extension(AsyncMLLMBaseExtension):
         su.session.input_audio_transcription = InputAudioTranscription(
             language=self.config.language,
         )
+        self.ten_env.log_info(f"update session {su}")
+
         await self.conn.send_request(su)
 
     async def _handle_tool_call(

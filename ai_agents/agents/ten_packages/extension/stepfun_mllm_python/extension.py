@@ -10,6 +10,8 @@ import time
 from dataclasses import dataclass
 from typing import Literal
 
+from pydantic import BaseModel
+
 from ten_ai_base.mllm import AsyncMLLMBaseExtension
 from ten_ai_base.struct import (
     MLLMClientFunctionCallOutput,
@@ -22,7 +24,6 @@ from ten_ai_base.struct import (
 )
 from ten_runtime import AudioFrame, AsyncTenEnv
 
-from ten_ai_base.config import BaseConfig
 from ten_ai_base.types import LLMToolMetadata
 
 from .realtime.connection import RealtimeApiConnection
@@ -61,7 +62,7 @@ from .realtime.struct import (
 
 
 @dataclass
-class StepFunRealtimeConfig(BaseConfig):
+class StepFunRealtimeConfig(BaseModel):
     base_url: str = "wss://api.stepfun.com"
     api_key: str = ""
     path: str = "/v1/realtime"
@@ -118,7 +119,8 @@ class StepFunRealtime2Extension(AsyncMLLMBaseExtension):
         self.ten_env = ten_env
         self.loop = asyncio.get_event_loop()
 
-        self.config = await StepFunRealtimeConfig.create_async(ten_env=ten_env)
+        properties, _ = await ten_env.get_property_to_json(None)
+        self.config = StepFunRealtimeConfig.model_validate_json(properties)
         ten_env.log_info(f"config: {self.config}")
 
         if not self.config.api_key:
@@ -145,7 +147,7 @@ class StepFunRealtime2Extension(AsyncMLLMBaseExtension):
         try:
             self.conn = RealtimeApiConnection(
                 ten_env=self.ten_env,
-                base_uri=self.config.base_uri,
+                base_url=self.config.base_url,
                 path=self.config.path,
                 api_key=self.config.api_key,
                 model=self.config.model,
