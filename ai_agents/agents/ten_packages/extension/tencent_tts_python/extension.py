@@ -171,10 +171,12 @@ class TencentTTSExtension(AsyncTTS2BaseExtension):
 
             # Check if text is empty
             if t.text.strip() == "":
-                self.ten_env.log_info("Received empty text for TTS request")
+                self.ten_env.log_info(
+                    f"Received empty text for TTS request, text_input_end: {t.text_input_end}"
+                )
                 if t.text_input_end:
                     self.current_request_finished = True
-                return
+                    await self._handle_tts_audio_end(t)
 
             # Check if request is flushed
             if self.current_request_id in self.flushed_request_ids:
