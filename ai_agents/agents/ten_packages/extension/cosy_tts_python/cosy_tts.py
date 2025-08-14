@@ -141,7 +141,9 @@ class CosyTTSClient:
         """Start the TTS client and initialize components."""
         # Initialize audio data queue
         self._receive_queue = asyncio.Queue()
-        self._callback = AsyncIteratorCallback(self.ten_env, self._receive_queue)
+        self._callback = AsyncIteratorCallback(
+            self.ten_env, self._receive_queue
+        )
 
         # Create synthesizer with configuration
         self.synthesizer = SpeechSynthesizer(
@@ -220,7 +222,9 @@ class CosyTTSClient:
             while not self.stopping:
                 try:
                     if self._receive_queue is None:
-                        self.ten_env.log_error("TTS receive queue is not initialized")
+                        self.ten_env.log_error(
+                            "TTS receive queue is not initialized"
+                        )
                         break
 
                     done, message_type, data = await asyncio.wait_for(

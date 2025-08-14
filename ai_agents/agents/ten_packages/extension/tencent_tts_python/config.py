@@ -90,7 +90,9 @@ class TencentTTSConfig(BaseModel):
         ]
 
         for param_name in param_names:
-            if param_name in self.params and not self.is_black_list_params(param_name):
+            if param_name in self.params and not self.is_black_list_params(
+                param_name
+            ):
                 setattr(self, param_name, self.params[param_name])
 
     def validate_params(self) -> None:
