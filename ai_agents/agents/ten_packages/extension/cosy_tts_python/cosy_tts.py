@@ -257,7 +257,7 @@ class CosyTTSClient:
             raise CosyTTSTaskFailedException(
                 error_code=ERROR_CODE_TTS_FAILED,
                 error_msg=str(e),
-            )
+            ) from e
 
     def _duration_in_ms(self, start: datetime, end: datetime) -> int:
         """
