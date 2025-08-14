@@ -19,6 +19,17 @@ MESSAGE_TYPE_CMD_ERROR = 3
 
 ERROR_CODE_TTS_FAILED = -1
 
+# Audio format mapping constants
+AUDIO_FORMAT_MAPPING = {
+    8000: AudioFormat.PCM_8000HZ_MONO_16BIT,
+    16000: AudioFormat.PCM_16000HZ_MONO_16BIT,
+    22050: AudioFormat.PCM_22050HZ_MONO_16BIT,
+    24000: AudioFormat.PCM_24000HZ_MONO_16BIT,
+    44100: AudioFormat.PCM_44100HZ_MONO_16BIT,
+    48000: AudioFormat.PCM_48000HZ_MONO_16BIT,
+}
+DEFAULT_AUDIO_FORMAT = AudioFormat.PCM_16000HZ_MONO_16BIT
+
 
 class CosyTTSTaskFailedException(Exception):
     """Exception raised when Cosy TTS task fails"""
@@ -135,7 +146,7 @@ class CosyTTSClient:
         # Create synthesizer with configuration
         self.synthesizer = SpeechSynthesizer(
             callback=self._callback,
-            format=AudioFormat.PCM_16000HZ_MONO_16BIT,
+            format=self._get_audio_format(),
             model=self.config.model,
             voice=self.config.voice,
         )
@@ -268,3 +279,19 @@ class CosyTTSClient:
             Duration in milliseconds from start to now
         """
         return self._duration_in_ms(start, datetime.now())
+
+    def _get_audio_format(self) -> AudioFormat:
+        """
+        Automatically generate AudioFormat based on configuration.
+
+        Returns:
+            AudioFormat: The appropriate audio format for the configuration
+        """
+        if self.config.sample_rate in AUDIO_FORMAT_MAPPING:
+            return AUDIO_FORMAT_MAPPING[self.config.sample_rate]
+
+        # Fallback to default format if configuration not supported
+        self.ten_env.log_warn(
+            f"Unsupported audio format: {self.config.sample_rate}Hz, using default format: PCM_16000HZ_MONO_16BIT"
+        )
+        return DEFAULT_AUDIO_FORMAT
