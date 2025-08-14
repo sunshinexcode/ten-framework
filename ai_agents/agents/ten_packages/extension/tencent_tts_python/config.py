@@ -50,6 +50,7 @@ class TencentTTSConfig(BaseModel):
     dump_path: str = "/tmp"
 
     # Parameters
+    # Function reserved, currently empty, may need to add content later
     black_list_params: list[str] = Field(default_factory=list)
     params: dict[str, Any] = Field(default_factory=dict)
 
@@ -89,9 +90,7 @@ class TencentTTSConfig(BaseModel):
         ]
 
         for param_name in param_names:
-            if param_name in self.params and not self.is_black_list_params(
-                param_name
-            ):
+            if param_name in self.params and not self.is_black_list_params(param_name):
                 setattr(self, param_name, self.params[param_name])
 
     def validate_params(self) -> None:
