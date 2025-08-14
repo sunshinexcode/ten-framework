@@ -110,8 +110,6 @@ class TencentTTSExtension(AsyncTTS2BaseExtension):
         ten_env.log_info(f"on_data: {data_name}")
 
         if data.get_name() == DATA_FLUSH:
-            await self._flush()
-
             flush_id, _ = data.get_property_string("flush_id")
             if flush_id:
                 ten_env.log_info(f"Received flush request for ID: {flush_id}")
@@ -127,6 +125,9 @@ class TencentTTSExtension(AsyncTTS2BaseExtension):
                             None, TTSAudioEndReason.INTERRUPTED
                         )
                         self.current_request_finished = True
+
+            # Flush the current request
+            await self._flush()
 
         await super().on_data(ten_env, data)
 
@@ -180,7 +181,6 @@ class TencentTTSExtension(AsyncTTS2BaseExtension):
                 self.ten_env.log_info(
                     f"Request {self.current_request_id} was flushed. Stopping processing."
                 )
-                self.flushed_request_ids.remove(self.current_request_id)
                 return
 
             # Record TTFB timing
