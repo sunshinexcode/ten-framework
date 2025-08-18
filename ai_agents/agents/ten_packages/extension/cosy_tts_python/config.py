@@ -30,7 +30,7 @@ def mask_sensitive_data(
 
 class CosyTTSConfig(BaseModel):
     # Cosy TTS credentials
-    api_key: str  # Cosy TTS API Key
+    api_key: str = ""  # Cosy TTS API Key
 
     # TTS specific configs
     model: str = "cosyvoice-v1"  # Model name
@@ -80,6 +80,9 @@ class CosyTTSConfig(BaseModel):
                 param_name
             ):
                 setattr(self, param_name, self.params[param_name])
+
+                if param_name in ["api_key"]:
+                    del self.params[param_name]
 
     def validate_params(self) -> None:
         """Validate required configuration parameters."""

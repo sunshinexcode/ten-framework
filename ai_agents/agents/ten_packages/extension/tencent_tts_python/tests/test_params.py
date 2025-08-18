@@ -61,22 +61,35 @@ def test_params_passthrough(MockTencentTTSClient):
     # --- Test Setup ---
     # Define a configuration with custom, arbitrary parameters inside 'params'.
     # These are the parameters we expect to be "passed through".
-    passthrough_params = {
+    real_params = {
         "app_id": "test_app_id",
         "secret_id": "test_secret_id",
         "secret_key": "test_secret_key",
-        "model": "tts_v2",
-        "audio_setting": {"format": "pcm", "sample_rate": 16000, "channels": 1},
-        "voice_setting": {"voice_id": "male-qn-qingse"},
+        "codec": "pcm",
+        "emotion_category": "",
+        "emotion_intensity": 0,
+        "enable_words": False,
+        "sample_rate": 24000,
+        "speed": 0,
+        "voice_type": "0",
+        "volume": 0,
     }
-    passthrough_config = {
-        "params": passthrough_params,
+    passthrough_params = {
+        "codec": "pcm",
+        "emotion_category": "",
+        "emotion_intensity": 0,
+        "enable_words": False,
+        "sample_rate": 24000,
+        "speed": 0,
+        "voice_type": "0",
+        "volume": 0,
+    }
+    real_config = {
+        "params": real_params,
     }
 
     tester = ExtensionTesterForPassthrough()
-    tester.set_test_mode_single(
-        "tencent_tts_python", json.dumps(passthrough_config)
-    )
+    tester.set_test_mode_single("tencent_tts_python", json.dumps(real_config))
 
     print("Running passthrough test...")
     tester.run()

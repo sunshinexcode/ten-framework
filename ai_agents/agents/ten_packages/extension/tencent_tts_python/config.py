@@ -31,9 +31,9 @@ def mask_sensitive_data(
 # Docs: https://cloud.tencent.com/document/product/1073/108595
 class TencentTTSConfig(BaseModel):
     # Tencent Cloud credentials
-    app_id: str  # Tencent Cloud App ID
-    secret_key: str  # Tencent Cloud Secret Key
-    secret_id: str  # Tencent Cloud Secret ID
+    app_id: str = ""  # Tencent Cloud App ID
+    secret_key: str = ""  # Tencent Cloud Secret Key
+    secret_id: str = ""  # Tencent Cloud Secret ID
 
     # TTS specific configs
     codec: str = "pcm"  # Audio codec
@@ -94,6 +94,9 @@ class TencentTTSConfig(BaseModel):
                 param_name
             ):
                 setattr(self, param_name, self.params[param_name])
+
+                if param_name in ["app_id", "secret_key", "secret_id"]:
+                    del self.params[param_name]
 
     def validate_params(self) -> None:
         """Validate required configuration parameters."""

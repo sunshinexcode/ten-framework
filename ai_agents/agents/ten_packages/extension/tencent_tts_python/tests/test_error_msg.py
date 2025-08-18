@@ -61,7 +61,9 @@ def test_empty_params_fatal_error():
     print("Starting test_empty_params_fatal_error...")
 
     # Empty params configuration
-    empty_params_config = {"params": {}}
+    empty_params_config = {
+        "params": {"app_id": "", "secret_key": "", "secret_id": ""}
+    }
 
     tester = ExtensionTesterEmptyParams()
     tester.set_test_mode_single(

@@ -61,20 +61,23 @@ def test_params_passthrough(MockCosyTTSClient):
     # --- Test Setup ---
     # Define a configuration with custom, arbitrary parameters inside 'params'.
     # These are the parameters we expect to be "passed through".
-    passthrough_params = {
+    real_params = {
         "api_key": "a_valid_key",
-        "model": "tts_v2",
-        "audio_setting": {"format": "pcm", "sample_rate": 16000, "channels": 1},
-        "voice_setting": {"voice_id": "male-qn-qingse"},
+        "model": "cosyvoice-v1",
+        "sample_rate": 16000,
+        "voice": "longxiaochun",
     }
-    passthrough_config = {
-        "params": passthrough_params,
+    passthrough_params = {
+        "model": "cosyvoice-v1",
+        "sample_rate": 16000,
+        "voice": "longxiaochun",
+    }
+    real_config = {
+        "params": real_params,
     }
 
     tester = ExtensionTesterForPassthrough()
-    tester.set_test_mode_single(
-        "cosy_tts_python", json.dumps(passthrough_config)
-    )
+    tester.set_test_mode_single("cosy_tts_python", json.dumps(real_config))
 
     print("Running passthrough test...")
     tester.run()
