@@ -30,7 +30,7 @@ def mask_sensitive_data(
 
 class CosyTTSConfig(BaseModel):
     # Cosy TTS credentials
-    api_key: str = ""  # Cosy TTS API Key
+    api_key: str  # Cosy TTS API Key
 
     # TTS specific configs
     model: str = "cosyvoice-v1"  # Model name

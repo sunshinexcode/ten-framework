@@ -17,7 +17,7 @@ from ten_ai_base.message import (
     ModuleVendorException,
     TTSAudioEndReason,
 )
-from ten_ai_base.struct import TTSTextInput, TTSTextResult
+from ten_ai_base.struct import TTSTextInput
 from ten_ai_base.tts2 import AsyncTTS2BaseExtension, DATA_FLUSH
 from ten_runtime import AsyncTenEnv
 
@@ -125,7 +125,7 @@ class CosyTTSExtension(AsyncTTS2BaseExtension):
 
                     if self.request_start_ts:
                         await self._handle_tts_audio_end(
-                            None, TTSAudioEndReason.INTERRUPTED
+                            TTSAudioEndReason.INTERRUPTED
                         )
                         self.current_request_finished = True
 
@@ -164,12 +164,6 @@ class CosyTTSExtension(AsyncTTS2BaseExtension):
             elif self.current_request_finished:
                 error_msg = f"Received a message for a finished request_id '{t.request_id}' with text_input_end=False."
                 self.ten_env.log_error(error_msg)
-                await self._send_tts_error(
-                    error_msg,
-                    vendor_info=ModuleErrorVendorInfo(vendor=self.vendor()),
-                    code=ModuleErrorCode.NON_FATAL_ERROR.value,
-                    request_id=t.request_id,
-                )
                 return
 
             # Check if text is empty
@@ -179,7 +173,7 @@ class CosyTTSExtension(AsyncTTS2BaseExtension):
                 )
                 if t.text_input_end:
                     self.current_request_finished = True
-                    await self._handle_tts_audio_end(t)
+                    await self._handle_tts_audio_end()
 
             # Check if request is flushed
             if self.current_request_id in self.flushed_request_ids:
@@ -253,7 +247,7 @@ class CosyTTSExtension(AsyncTTS2BaseExtension):
                     self.ten_env.log_info(
                         f"All pcm received done, current_request_id: {self.current_request_id}, current_turn_id: {self.current_turn_id}"
                     )
-                    await self._handle_tts_audio_end(t)
+                    await self._handle_tts_audio_end()
                     break
 
             self.ten_env.log_info(
@@ -429,7 +423,6 @@ class CosyTTSExtension(AsyncTTS2BaseExtension):
 
     async def _handle_tts_audio_end(
         self,
-        t: TTSTextInput | None,
         reason: TTSAudioEndReason = TTSAudioEndReason.REQUEST_END,
     ) -> None:
         """
@@ -450,20 +443,6 @@ class CosyTTSExtension(AsyncTTS2BaseExtension):
             request_event_interval = int(
                 (datetime.now() - self.request_start_ts).total_seconds() * 1000
             )
-
-            if t is not None:
-                # Send TTS text result
-                await self.send_tts_text_result(
-                    TTSTextResult(
-                        request_id=self.current_request_id,
-                        text=t.text,
-                        text_result_end=t.text_input_end,
-                        start_ms=0,
-                        duration_ms=self.request_total_audio_duration_ms,
-                        words=[],
-                        metadata={},
-                    )
-                )
 
             # Send TTS audio end event
             await self.send_tts_audio_end(

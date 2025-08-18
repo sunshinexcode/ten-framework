@@ -31,9 +31,9 @@ def mask_sensitive_data(
 # Docs: https://cloud.tencent.com/document/product/1073/108595
 class TencentTTSConfig(BaseModel):
     # Tencent Cloud credentials
-    app_id: str = ""  # Tencent Cloud App ID
-    secret_key: str = ""  # Tencent Cloud Secret Key
-    secret_id: str = ""  # Tencent Cloud Secret ID
+    app_id: str  # Tencent Cloud App ID
+    secret_key: str  # Tencent Cloud Secret Key
+    secret_id: str  # Tencent Cloud Secret ID
 
     # TTS specific configs
     codec: str = "pcm"  # Audio codec
