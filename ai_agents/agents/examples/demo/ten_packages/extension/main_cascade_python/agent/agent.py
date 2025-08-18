@@ -1,5 +1,6 @@
 import asyncio
 import json
+from typing import Awaitable, Callable, Optional
 from .llm_exec import LLMExec
 from ten_runtime import AsyncTenEnv, Cmd, CmdResult, Data, StatusCode
 from ten_ai_base.types import LLMToolMetadata
@@ -10,39 +11,122 @@ class Agent:
     def __init__(self, ten_env: AsyncTenEnv):
         self.ten_env: AsyncTenEnv = ten_env
         self.stopped = False
-        self.event_queue: asyncio.Queue[AgentEvent] = asyncio.Queue()
+
+        # Callback registry
+        self._callbacks: dict[
+            AgentEvent, list[Callable[[AgentEvent], Awaitable]]
+        ] = {}
+
+        # Queues for ordered processing
+        self._asr_queue: asyncio.Queue[ASRResultEvent] = asyncio.Queue()
+        self._llm_queue: asyncio.Queue[LLMResponseEvent] = asyncio.Queue()
+
+        # Current consumer tasks
+        self._asr_consumer: Optional[asyncio.Task] = None
+        self._llm_consumer: Optional[asyncio.Task] = None
+        self._llm_active_task: Optional[asyncio.Task] = (
+            None  # currently running handler
+        )
+
         self.llm_exec = LLMExec(ten_env)
         self.llm_exec.on_response = (
             self._on_llm_response
         )  # callback handled internally
-        self.llm_exec.on_reasoning_response = (
-            self._on_llm_reasoning_response
-        )  # callback handled internally
 
+        # Start consumers
+        self._asr_consumer = asyncio.create_task(self._consume_asr())
+        self._llm_consumer = asyncio.create_task(self._consume_llm())
+
+    # === Register handlers ===
+    def on(
+        self,
+        event_type: AgentEvent,
+        handler: Callable[[AgentEvent], Awaitable] = None,
+    ):
+        """
+        Register a callback for a given event type.
+
+        Can be used in two ways:
+        1) agent.on(EventType, handler)
+        2) @agent.on(EventType)
+           async def handler(event: EventType): ...
+        """
+
+        def decorator(func: Callable[[AgentEvent], Awaitable]):
+            self._callbacks.setdefault(event_type, []).append(func)
+            return func
+
+        if handler is None:
+            return decorator
+        else:
+            return decorator(handler)
+
+    async def _dispatch(self, event: AgentEvent):
+        """Dispatch event to registered handlers sequentially."""
+        for etype, handlers in self._callbacks.items():
+            if isinstance(event, etype):
+                for h in handlers:
+                    try:
+                        await h(event)
+                    except asyncio.CancelledError:
+                        raise
+                    except Exception as e:
+                        self.ten_env.log_error(
+                            f"Handler error for {etype}: {e}"
+                        )
+
+    # === Consumers ===
+    async def _consume_asr(self):
+        while not self.stopped:
+            event = await self._asr_queue.get()
+            await self._dispatch(event)
+
+    async def _consume_llm(self):
+        while not self.stopped:
+            event = await self._llm_queue.get()
+            # Run handler as a task so we can cancel mid-flight
+            self._llm_active_task = asyncio.create_task(self._dispatch(event))
+            try:
+                await self._llm_active_task
+            except asyncio.CancelledError:
+                self.ten_env.log_info("[Agent] Active LLM task cancelled")
+            finally:
+                self._llm_active_task = None
+
+    # === Emit events ===
+    async def _emit_asr(self, event: ASRResultEvent):
+        await self._asr_queue.put(event)
+
+    async def _emit_llm(self, event: LLMResponseEvent):
+        await self._llm_queue.put(event)
+
+    async def _emit_direct(self, event: AgentEvent):
+        await self._dispatch(event)
+
+    # === Incoming from runtime ===
     async def on_cmd(self, cmd: Cmd):
-        cmd_name = cmd.get_name()
         try:
-            if cmd_name == "on_user_joined":
-                event = UserJoinedEvent()
-            elif cmd_name == "on_user_left":
-                event = UserLeftEvent()
-            elif cmd_name == "tool_register":
+            name = cmd.get_name()
+            if name == "on_user_joined":
+                await self._emit_direct(UserJoinedEvent())
+            elif name == "on_user_left":
+                await self._emit_direct(UserLeftEvent())
+            elif name == "tool_register":
                 tool_json, err = cmd.get_property_to_json("tool")
                 if err:
                     raise RuntimeError(f"Invalid tool metadata: {err}")
                 tool = LLMToolMetadata.model_validate_json(tool_json)
-                event = ToolRegisterEvent(
-                    tool=tool, source=cmd.get_source().extension_name
+                await self._emit_direct(
+                    ToolRegisterEvent(
+                        tool=tool, source=cmd.get_source().extension_name
+                    )
                 )
             else:
-                self.ten_env.log_warn(f"Unhandled cmd: {cmd_name}")
-                return
+                self.ten_env.log_warn(f"Unhandled cmd: {name}")
 
-            await self.event_queue.put(event)
             await self.ten_env.return_result(
                 CmdResult.create(StatusCode.OK, cmd)
             )
-
         except Exception as e:
             self.ten_env.log_error(f"on_cmd error: {e}")
             await self.ten_env.return_result(
@@ -50,26 +134,30 @@ class Agent:
             )
 
     async def on_data(self, data: Data):
-        data_name = data.get_name()
         try:
-            if data_name == "asr_result":
+            if data.get_name() == "asr_result":
                 asr_json, _ = data.get_property_to_json(None)
                 asr = json.loads(asr_json)
-                event = ASRResultEvent(
-                    text=asr.get("text", ""),
-                    final=asr.get("final", False),
-                    metadata=asr.get("metadata", {}),
+                await self._emit_asr(
+                    ASRResultEvent(
+                        text=asr.get("text", ""),
+                        final=asr.get("final", False),
+                        metadata=asr.get("metadata", {}),
+                    )
                 )
-                await self.event_queue.put(event)
             else:
-                self.ten_env.log_warn(f"Unhandled data: {data_name}")
-
+                self.ten_env.log_warn(f"Unhandled data: {data.get_name()}")
         except Exception as e:
             self.ten_env.log_error(f"on_data error: {e}")
 
-    async def get_event(self) -> AgentEvent:
-        return await self.event_queue.get()
+    async def _on_llm_response(
+        self, ten_env: AsyncTenEnv, delta: str, text: str, is_final: bool
+    ):
+        await self._emit_llm(
+            LLMResponseEvent(delta=delta, text=text, is_final=is_final)
+        )
 
+    # === LLM control ===
     async def register_llm_tool(self, tool: LLMToolMetadata, source: str):
         """
         Register tools with the LLM.
@@ -91,6 +179,23 @@ class Agent:
         """
         await self.llm_exec.flush()
 
+        # Clear queue
+        while not self._llm_queue.empty():
+            try:
+                self._llm_queue.get_nowait()
+                self._llm_queue.task_done()
+            except asyncio.QueueEmpty:
+                break
+
+        # Cancel active LLM task
+        if self._llm_active_task and not self._llm_active_task.done():
+            self._llm_active_task.cancel()
+            try:
+                await self._llm_active_task
+            except asyncio.CancelledError:
+                pass
+            self._llm_active_task = None
+
     async def stop(self):
         """
         Stop the agent processing.
@@ -98,32 +203,8 @@ class Agent:
         """
         self.stopped = True
         await self.llm_exec.stop()
-        await self.event_queue.put(None)
-
-    async def _on_llm_response(
-        self, ten_env: AsyncTenEnv, delta: str, text: str, is_final: bool
-    ):
-        """
-        Internal callback for streaming LLM output, wrapped as an AgentEvent.
-        """
-        event = LLMResponseEvent(
-            type="message",
-            delta=delta,
-            text=text,
-            is_final=is_final,
-        )
-        await self.event_queue.put(event)
-
-    async def _on_llm_reasoning_response(
-        self, ten_env: AsyncTenEnv, delta: str, text: str, is_final: bool
-    ):
-        """
-        Internal callback for streaming LLM output, wrapped as an AgentEvent.
-        """
-        event = LLMResponseEvent(
-            type="reasoning",
-            delta=delta,
-            text=text,
-            is_final=is_final,
-        )
-        await self.event_queue.put(event)
+        await self.flush_llm()
+        if self._asr_consumer:
+            self._asr_consumer.cancel()
+        if self._llm_consumer:
+            self._llm_consumer.cancel()

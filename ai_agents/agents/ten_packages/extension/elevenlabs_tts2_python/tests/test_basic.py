@@ -154,10 +154,12 @@ def test_dump_functionality(MockElevenLabsTTS2):
 
     # Set up dump configuration
     dump_config = {
-        "key": "fake_elevenlabs_key_for_mock_testing",
-        "dump": True,
-        "dump_path": dump_dir,
-        "params": {"audio_params": {"sample_rate": 16000}},
+        "params": {
+            "api_key": "fake_elevenlabs_key_for_mock_testing",
+            "dump": True,
+            "dump_path": dump_dir,
+            "sample_rate": 16000,
+        },
     }
 
     tester.set_test_mode_single(
@@ -392,8 +394,10 @@ def test_flush_logic(MockElevenLabsTTS2):
         mock_text_to_speech_ws_streaming
     )
 
-    # Mock the handle_flush method
+    # Mock the handle_flush method and related methods
     mock_client_instance.handle_flush = AsyncMock()
+    mock_client_instance.reconnect_connection = AsyncMock()
+    mock_client_instance._handle_reconnection = AsyncMock()
 
     # Mock the get_synthesized_audio method to return audio data
     audio_data_queue = asyncio.Queue()

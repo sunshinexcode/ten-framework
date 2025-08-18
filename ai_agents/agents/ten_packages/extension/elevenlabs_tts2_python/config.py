@@ -1,4 +1,4 @@
-from typing import Any, Dict
+from typing import Any, Dict, List
 from pydantic import BaseModel
 
 
@@ -27,8 +27,9 @@ class ElevenLabsTTS2Config(BaseModel):
     style: float = 0.0
     voice_id: str = "pNInz6obpgDQGcFmaJgB"
     dump: bool = False
-    dump_path: str = "./dump/"
+    dump_path: str = "./"
     params: Dict[str, Any] = {}
+    black_list_keys: List[str] = ["api_key"]
 
     def to_str(self, sensitive_handling: bool = False) -> str:
         if not sensitive_handling:
@@ -41,6 +42,13 @@ class ElevenLabsTTS2Config(BaseModel):
 
     def update_params(self) -> None:
         # This function allows overriding default config values with 'params' from property.json
+        # pylint: disable=no-member
+
         for key, value in self.params.items():
             if hasattr(self, key):
                 setattr(self, key, value)
+
+        # Delete keys after iteration is complete
+        for key in self.black_list_keys:
+            if key in self.params:
+                del self.params[key]

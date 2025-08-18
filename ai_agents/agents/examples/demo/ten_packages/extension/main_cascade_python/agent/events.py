@@ -55,7 +55,7 @@ class ASRResultEvent(AgentEventBase):
 class LLMResponseEvent(AgentEventBase):
     """Event triggered when LLM returns a streaming response."""
 
-    type: Literal["message"] | Literal["reasoning"] = "message"
+    type: Literal["llm"] = "llm"
     name: Literal["llm_response"] = "llm_response"
     delta: str
     text: str
