@@ -24,7 +24,6 @@ from ten_runtime import AsyncTenEnv
 from .config import TencentTTSConfig
 from .tencent_tts import (
     ERROR_CODE_AUTHORIZATION_FAILED,
-    ERROR_CODE_INVALID_PARAMS,
     MESSAGE_TYPE_PCM,
     TencentTTSClient,
     TencentTTSTaskFailedException,
@@ -75,15 +74,19 @@ class TencentTTSExtension(AsyncTTS2BaseExtension):
                 # Update params from config
                 self.config.update_params()
 
-                self.ten_env.log_info(
-                    f"KEYPOINT config: {self.config.to_str()}"
-                )
+                self.ten_env.log_info(f"KEYPOINT config: {self.config.to_str()}")
 
                 # Validate params
                 self.config.validate_params()
 
             # Initialize Tencent TTS client
-            self.client = TencentTTSClient(self.config, ten_env, self.vendor())
+            self.client = TencentTTSClient(
+                self.config,
+                ten_env,
+                self.vendor(),
+                send_fatal_tts_error=self.send_fatal_tts_error,
+                send_non_fatal_tts_error=self.send_non_fatal_tts_error,
+            )
             asyncio.create_task(self.client.start())
         except Exception as e:
             ten_env.log_error(f"on_init failed: {traceback.format_exc()}")
@@ -96,6 +99,7 @@ class TencentTTSExtension(AsyncTTS2BaseExtension):
     async def on_stop(self, ten_env: AsyncTenEnv) -> None:
         if self.client:
             await self.client.stop()
+            self.client = None
 
         # Clean up all PCMWriters
         await self._cleanup_all_pcm_writers()
@@ -117,18 +121,13 @@ class TencentTTSExtension(AsyncTTS2BaseExtension):
                 ten_env.log_info(f"Received flush request for ID: {flush_id}")
                 self.flushed_request_ids.add(flush_id)
 
-                if (
-                    self.current_request_id
-                    and self.current_request_id == flush_id
-                ):
+                if self.current_request_id and self.current_request_id == flush_id:
                     ten_env.log_info(
                         f"Current request {self.current_request_id} is being flushed. Sending INTERRUPTED."
                     )
 
                     if self.request_start_ts:
-                        await self._handle_tts_audio_end(
-                            TTSAudioEndReason.INTERRUPTED
-                        )
+                        await self._handle_tts_audio_end(TTSAudioEndReason.INTERRUPTED)
                         self.current_request_finished = True
 
             # Flush the current request
@@ -144,6 +143,24 @@ class TencentTTSExtension(AsyncTTS2BaseExtension):
         try:
             self.ten_env.log_info(
                 f"KEYPOINT Requesting TTS for text: {t.text}, text_input_end: {t.text_input_end}, request_id: {t.request_id}, current_request_id: {self.current_request_id}"
+            )
+
+            if self.client is None:
+                self.ten_env.log_info(
+                    "TTS client is not initialized, attempting to reconnect..."
+                )
+                self.client = TencentTTSClient(
+                    self.config,
+                    self.ten_env,
+                    self.vendor(),
+                    send_fatal_tts_error=self.send_fatal_tts_error,
+                    send_non_fatal_tts_error=self.send_non_fatal_tts_error,
+                )
+                await self.client.start()
+                self.ten_env.log_info("TTS client reconnected successfully.")
+
+            self.ten_env.log_info(
+                f"current_request_id: {self.current_request_id}, new request_id: {t.request_id}, current_request_finished: {self.current_request_finished}"
             )
 
             if t.request_id != self.current_request_id:
@@ -188,7 +205,6 @@ class TencentTTSExtension(AsyncTTS2BaseExtension):
             if self.request_start_ts is None:
                 self.request_start_ts = datetime.now()
 
-            # Get audio stream from Tencent TTS
             self.ten_env.log_info(
                 f"Calling client.synthesize_audio() with text: {t.text}, current_request_id: {self.current_request_id}, current_turn_id: {self.current_turn_id}"
             )
@@ -265,10 +281,7 @@ class TencentTTSExtension(AsyncTTS2BaseExtension):
             )
             code = ModuleErrorCode.NON_FATAL_ERROR.value
 
-            if (
-                e.error_code == ERROR_CODE_INVALID_PARAMS
-                or e.error_code == ERROR_CODE_AUTHORIZATION_FAILED
-            ):
+            if e.error_code == ERROR_CODE_AUTHORIZATION_FAILED:
                 code = ModuleErrorCode.FATAL_ERROR.value
 
             await self._send_tts_error(
@@ -298,6 +311,41 @@ class TencentTTSExtension(AsyncTTS2BaseExtension):
                 code=ModuleErrorCode.NON_FATAL_ERROR.value,
                 vendor_info=ModuleErrorVendorInfo(vendor=self.vendor()),
             )
+
+            # When a connection error occurs, destroy the client instance.
+            # It will be recreated on the next request.
+            if isinstance(e, ConnectionRefusedError) and self.client:
+                await self.client.stop()
+                self.client = None
+                self.ten_env.log_info(
+                    "Client connection dropped, instance destroyed. Will attempt to reconnect on next request."
+                )
+
+    async def send_fatal_tts_error(self, error_message: str) -> None:
+        self.ten_env.log_error(f"send_fatal_tts_error: {error_message}")
+
+        await self.send_tts_error(
+            self.current_request_id or "",
+            ModuleError(
+                message=error_message,
+                module=ModuleType.TTS,
+                code=ModuleErrorCode.FATAL_ERROR,
+                vendor_info=ModuleErrorVendorInfo(vendor=self.vendor()),
+            ),
+        )
+
+    async def send_non_fatal_tts_error(self, error_message: str) -> None:
+        self.ten_env.log_error(f"send_non_fatal_tts_error: {error_message}")
+
+        await self.send_tts_error(
+            self.current_request_id or "",
+            ModuleError(
+                message=error_message,
+                module=ModuleType.TTS,
+                code=ModuleErrorCode.NON_FATAL_ERROR,
+                vendor_info=ModuleErrorVendorInfo(vendor=self.vendor()),
+            ),
+        )
 
     def synthesize_audio_sample_rate(self) -> int:
         """
@@ -354,9 +402,7 @@ class TencentTTSExtension(AsyncTTS2BaseExtension):
         for request_id, recorder in self.recorder_map.items():
             try:
                 await recorder.flush()
-                self.ten_env.log_info(
-                    f"Flushed PCMWriter for request_id: {request_id}"
-                )
+                self.ten_env.log_info(f"Flushed PCMWriter for request_id: {request_id}")
             except Exception as e:
                 self.ten_env.log_error(
                     f"Error flushing PCMWriter for request_id {request_id}: {e}"
@@ -434,10 +480,8 @@ class TencentTTSExtension(AsyncTTS2BaseExtension):
         """
         if self.request_start_ts:
             # Calculate total audio duration
-            self.request_total_audio_duration_ms = (
-                self._calculate_audio_duration(
-                    self.total_audio_bytes, self.config.sample_rate
-                )
+            self.request_total_audio_duration_ms = self._calculate_audio_duration(
+                self.total_audio_bytes, self.config.sample_rate
             )
             request_event_interval = int(
                 (datetime.now() - self.request_start_ts).total_seconds() * 1000
@@ -468,9 +512,7 @@ class TencentTTSExtension(AsyncTTS2BaseExtension):
             return
 
         # Clean up old PCMWriters (except current request_id)
-        old_request_ids = [
-            rid for rid in self.recorder_map.keys() if rid != request_id
-        ]
+        old_request_ids = [rid for rid in self.recorder_map.keys() if rid != request_id]
 
         for old_rid in old_request_ids:
             try:

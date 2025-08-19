@@ -1,5 +1,5 @@
 import asyncio
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from datetime import datetime
 import json
 import urllib.parse
@@ -18,6 +18,7 @@ from .config import TencentTTSConfig
 
 
 MESSAGE_TYPE_PCM = 1
+MESSAGE_TYPE_ERROR = 2
 
 # WebSocket command constants
 WS_CMD_STOP = "stop"
@@ -46,23 +47,23 @@ class TencentTTSClient:
         config: TencentTTSConfig,
         ten_env: AsyncTenEnv,
         vendor: str,
+        send_fatal_tts_error: Callable[[str], asyncio.Future] | None = None,
+        send_non_fatal_tts_error: Callable[[str], asyncio.Future] | None = None,
     ):
         # Configuration and environment
         self.config = config
         self.ten_env = ten_env
         self.vendor = vendor
+        self.send_fatal_tts_error = send_fatal_tts_error
+        self.send_non_fatal_tts_error = send_non_fatal_tts_error
 
         # Session management
         self.session_id: str = ""
-        self.session_trace_id: str = ""
-        self.stopping: bool = False
-        self.turn_id: int = 0
-
-        # WebSocket connection
-        self.ws: websockets.ClientConnection | None = None
 
         # Communication queues and components
-        self._receive_queue: asyncio.Queue[bytes] | None = None
+        self._receive_queue: (
+            asyncio.Queue[tuple[bool, int, bytes, dict[str, object]]] | None
+        ) = None
         self._synthesizer: FlowingSpeechSynthesizer | None = None
         self._ws: websockets.ClientConnection | None = None
         self._ws_cmd_queue: asyncio.Queue[dict[str, object]] | None = None
@@ -80,7 +81,45 @@ class TencentTTSClient:
         the current TTS synthesis operation.
         """
         await self._ws_cmd_queue.put(WS_CMD_CANCEL)
-        self.ten_env.log_info("__ws_receive_task had cancel done")
+        self.ten_env.log_info("_ws_receive_task had cancel done")
+
+    async def start(self):
+        """
+        Initialize and start the TTS client.
+
+        This method:
+        1. Creates credentials using config secrets
+        2. Initializes the speech synthesizer with configuration
+        3. Sets up all TTS parameters (codec, emotion, sample rate, etc.)
+        4. Creates async queues for communication
+        5. Establishes WebSocket connection
+        6. Starts the receive task for handling responses
+        """
+        credential_var = credential.Credential(
+            secret_key=self.config.secret_key, secret_id=self.config.secret_id
+        )
+
+        self._synthesizer = FlowingSpeechSynthesizer(
+            self.config.app_id, credential_var, None
+        )
+
+        self._synthesizer.set_codec(self.config.codec)
+        self._synthesizer.set_emotion_category(self.config.emotion_category)
+        self._synthesizer.set_emotion_intensity(self.config.emotion_intensity)
+        self._synthesizer.set_enable_subtitle(self.config.enable_words)
+        self._synthesizer.set_sample_rate(self.config.sample_rate)
+        self._synthesizer.set_speed(self.config.speed)
+        self._synthesizer.set_voice_type(self.config.voice_type)
+        self._synthesizer.set_volume(self.config.volume)
+
+        self._receive_queue = asyncio.Queue()
+        self._ws_cmd_queue = asyncio.Queue()
+
+        self._ws_receive_task = asyncio.create_task(
+            self._receive_tts_response_and_cmd()
+        )
+        await self._ws_reconnect()  # make sure tcp handshare in advance
+        self.ten_env.log_info("tencent tts start done")
 
     async def stop(self) -> None:
         """
@@ -89,24 +128,36 @@ class TencentTTSClient:
         Sends a stop command to the WebSocket receive task and waits
         for it to complete before returning.
         """
-        await self._ws_cmd_queue.put(WS_CMD_STOP)
+        self.ten_env.log_info("tencent tts stop start")
+        try:
+            await self._ws_cmd_queue.put(WS_CMD_STOP)
 
-        if self._ws_receive_task:
-            await self._ws_receive_task
-        self.ten_env.log_info("__ws_receive_task had close done")
+            if self._ws_receive_task:
+                try:
+                    await self._ws_receive_task
+                except Exception as e:
+                    self.ten_env.log_error(
+                        f"Error waiting for WebSocket receive task: {e}"
+                    )
+                    # Continue with cleanup even if task has errors
+                finally:
+                    self._ws_receive_task = None
+
+            self.ten_env.log_info("_ws_receive_task had close done")
+        except Exception as e:
+            self.ten_env.log_error(f"Error during TTS client stop: {e}")
 
     async def synthesize_audio(
         self,
         text: str,
     ) -> AsyncIterator[tuple[bool, str, bytes | dict[str, object]]]:
         """Convert text to speech audio stream."""
+        self.ten_env.log_info(f"tencent tts synthesize_audio start, text: {text}")
         start_time = datetime.now()
 
         try:
             if self._ws_need_wait_ready_event != None:
-                await asyncio.wait_for(
-                    self._ws_need_wait_ready_event.wait(), timeout=5
-                )
+                await asyncio.wait_for(self._ws_need_wait_ready_event.wait(), timeout=5)
 
             data = json.dumps(
                 # TODO(lint)
@@ -147,52 +198,6 @@ class TencentTTSClient:
             self.ten_env.log_info(
                 f"websocket loop done, duration {self._duration_in_ms_since(start_time)}ms"
             )
-
-    async def reset_turn_id(self) -> None:
-        """
-        Reset the turn ID to 0.
-
-        This method is used to reset the conversation turn counter,
-        typically called when starting a new conversation session.
-        """
-        self.turn_id = 0
-
-    async def start(self):
-        """
-        Initialize and start the TTS client.
-
-        This method:
-        1. Creates credentials using config secrets
-        2. Initializes the speech synthesizer with configuration
-        3. Sets up all TTS parameters (codec, emotion, sample rate, etc.)
-        4. Creates async queues for communication
-        5. Establishes WebSocket connection
-        6. Starts the receive task for handling responses
-        """
-        credential_var = credential.Credential(
-            secret_key=self.config.secret_key, secret_id=self.config.secret_id
-        )
-
-        self._synthesizer = FlowingSpeechSynthesizer(
-            self.config.app_id, credential_var, None
-        )
-
-        self._synthesizer.set_codec(self.config.codec)
-        self._synthesizer.set_emotion_category(self.config.emotion_category)
-        self._synthesizer.set_emotion_intensity(self.config.emotion_intensity)
-        self._synthesizer.set_enable_subtitle(self.config.enable_words)
-        self._synthesizer.set_sample_rate(self.config.sample_rate)
-        self._synthesizer.set_speed(self.config.speed)
-        self._synthesizer.set_voice_type(self.config.voice_type)
-        self._synthesizer.set_volume(self.config.volume)
-
-        self._receive_queue = asyncio.Queue()
-        self._ws_cmd_queue = asyncio.Queue()
-
-        await self._ws_reconnect()  # make sure tcp handshare in advance
-        self._ws_receive_task = asyncio.create_task(
-            self._receive_tts_response_and_cmd()
-        )
 
     def _duration_in_ms(self, start: datetime, end: datetime) -> int:
         """
@@ -235,20 +240,14 @@ class TencentTTSClient:
         session_id = str(uuid.uuid1())
         # TODO(lint)
         # pylint: disable=protected-access
-        params = self._synthesizer._FlowingSpeechSynthesizer__gen_params(
-            session_id
-        )
+        params = self._synthesizer._FlowingSpeechSynthesizer__gen_params(session_id)
         # TODO(lint)
         # pylint: disable=protected-access
-        signature = self._synthesizer._FlowingSpeechSynthesizer__gen_signature(
+        signature = self._synthesizer._FlowingSpeechSynthesizer__gen_signature(params)
+        # TODO(lint)
+        # pylint: disable=protected-access
+        req_url = self._synthesizer._FlowingSpeechSynthesizer__create_query_string(
             params
-        )
-        # TODO(lint)
-        # pylint: disable=protected-access
-        req_url = (
-            self._synthesizer._FlowingSpeechSynthesizer__create_query_string(
-                params
-            )
         )
         req_url += "&Signature=%s" % urllib.parse.quote(signature)
 
@@ -273,7 +272,6 @@ class TencentTTSClient:
                 self.ten_env.log_error(
                     "WebSocket reconnection disabled, stopping TTS response loop"
                 )
-                await self._receive_queue.put((True, MESSAGE_TYPE_PCM, b""))
                 return
 
             try:
@@ -319,7 +317,7 @@ class TencentTTSClient:
                                 pass
                             else:
                                 self.ten_env.log_warn(
-                                    f"__recieve_tts_reponse tencent tts recieve unsupport message:{resp}"
+                                    f"_receive_tts_reponse tencent tts recieve unsupport message:{resp}"
                                 )
 
                     elif isinstance(result, bytes):
@@ -329,34 +327,16 @@ class TencentTTSClient:
                             )
 
                     else:
-                        raise TypeError(
-                            "tts resp message type is not str and bytes"
-                        )
+                        raise TypeError("tts resp message type is not str and bytes")
 
             except TencentTTSTaskFailedException as e:
                 self.ten_env.log_error(
                     f"_receive_tts_response_and_cmd tencent tts get error:{e}"
                 )
-                # If it's an authorization error, disable retry and end the method
-                if (
-                    e.error_code == ERROR_CODE_INVALID_PARAMS
-                    or e.error_code == ERROR_CODE_AUTHORIZATION_FAILED
-                ):
-                    self.ten_env.log_error(
-                        f"Tencent TTS failed, disabling retry. Error: {e.error_msg} (code: {e.error_code})"
-                    )
-                    self._reconnect_allowed = False
-                    await self._receive_queue.put((True, MESSAGE_TYPE_PCM, b""))
-                    return
-
-                # For other errors, continue with reconnection
-                await self._receive_queue.put((True, MESSAGE_TYPE_PCM, b""))
-                await self._ws_reconnect()
+                raise e
 
             except Exception as e:
-                # For general exceptions, continue with reconnection
-                await self._receive_queue.put((True, MESSAGE_TYPE_PCM, b""))
-                await self._ws_reconnect()
+                self._reconnect_allowed = False
                 self.ten_env.log_error(
                     f"_recieve_tts_reponse tencent tts get error:{e}"
                 )
@@ -371,7 +351,7 @@ class TencentTTSClient:
         start_time = datetime.now()
         await self._ws.close()
         self.ten_env.log_info(
-            f"__ws_close_task done, duration:{self._duration_in_ms_since(start_time)}ms"
+            f"_ws_close_task done, duration:{self._duration_in_ms_since(start_time)}ms"
         )
 
     async def _ws_reconnect(self) -> None:
@@ -387,6 +367,7 @@ class TencentTTSClient:
         The method uses an event to signal when the connection is ready
         for TTS operations.
         """
+        self.ten_env.log_info("tencent tts _ws_reconnect start")
         self._ws_need_wait_ready_event = asyncio.Event()
 
         while True:
@@ -420,24 +401,27 @@ class TencentTTSClient:
                             return
                     else:
                         raise TypeError("tts resp message type is not str")
-            except TencentTTSTaskFailedException as e:
-                self.ten_env.log_error(
-                    f"__ws_reconnect tencent tts get error:{e}"
-                )
-                # If it's an authorization error, disable retry and break the loop
-                if (
-                    e.error_code == ERROR_CODE_INVALID_PARAMS
-                    or e.error_code == ERROR_CODE_AUTHORIZATION_FAILED
-                ):
-                    self.ten_env.log_error(
-                        f"Tencent TTS failed, disabling retry. Error: {e.error_msg} (code: {e.error_code})"
-                    )
-                    self._reconnect_allowed = False
-                    break
 
-            except Exception as e:
-                self.ten_env.log_error(
-                    f"__ws_reconnect tencent tts get error:{e}"
+            except websockets.exceptions.ConnectionClosedOK:
+                self.ten_env.log_warn(
+                    "Websocket connection closed OK during TTS processing"
                 )
+            except websockets.exceptions.ConnectionClosed:
+                self.ten_env.log_warn(
+                    "Websocket connection closed during TTS processing"
+                )
+            except TencentTTSTaskFailedException as e:
+                self.ten_env.log_error(f"_ws_reconnect tencent tts get error:{e}")
+
+                self._reconnect_allowed = False
+
+                if e.error_code == ERROR_CODE_AUTHORIZATION_FAILED:
+                    await self.send_fatal_tts_error(e.error_msg)
+                else:
+                    await self.send_non_fatal_tts_error(e.error_msg)
+
+                raise e
+            except Exception as e:
+                self.ten_env.log_error(f"_ws_reconnect tencent tts get error:{e}")
 
                 await asyncio.sleep(1)  # avoid too fast retry
