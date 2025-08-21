@@ -1,10 +1,9 @@
-import copy
+from typing import Any, Dict
 from pydantic import BaseModel, Field
-from typing import Any
 
 
 def mask_sensitive_data(
-    s: str, unmasked_start: int = 5, unmasked_end: int = 5, mask_char: str = "*"
+    s: str, unmasked_start: int = 3, unmasked_end: int = 3, mask_char: str = "*"
 ) -> str:
     """
     Mask a sensitive string by replacing the middle part with asterisks.
@@ -42,57 +41,40 @@ class CosyTTSConfig(BaseModel):
     dump_path: str = "/tmp"
 
     # Parameters
-    # Function reserved, currently empty, may need to add content later
-    black_list_params: list[str] = Field(default_factory=list)
     params: dict[str, Any] = Field(default_factory=dict)
-
-    def is_black_list_params(self, key: str) -> bool:
-        return key in self.black_list_params
-
-    def to_str(self, sensitive_handling: bool = True) -> str:
-        """Convert config to string with optional sensitive data handling."""
-        if not sensitive_handling:
-            return f"{self}"
-
-        config = copy.deepcopy(self)
-
-        # Encrypt sensitive fields
-        if config.api_key:
-            config.api_key = mask_sensitive_data(config.api_key)
-        if config.params and "api_key" in config.params:
-            config.params["api_key"] = mask_sensitive_data(
-                config.params["api_key"]
-            )
-
-        return f"{config}"
 
     def update_params(self) -> None:
         """Update config attributes from params dictionary."""
-        param_names = [
-            "api_key",
-            "model",
-            "sample_rate",
-            "voice",
-        ]
+        # Handle api_key parameter
+        if "api_key" in self.params:
+            self.api_key = self.params["api_key"]
+            del self.params["api_key"]
 
-        for param_name in param_names:
-            if param_name in self.params and not self.is_black_list_params(
-                param_name
-            ):
-                setattr(self, param_name, self.params[param_name])
+        # Handle model parameter
+        if "model" in self.params:
+            self.model = self.params["model"]
+            del self.params["model"]
 
-                if param_name in ["api_key"]:
-                    del self.params[param_name]
+        # Handle sample_rate parameter
+        if "sample_rate" in self.params:
+            self.sample_rate = self.params["sample_rate"]
+            del self.params["sample_rate"]
 
-    def validate_params(self) -> None:
-        """Validate required configuration parameters."""
-        required_fields = [
-            "api_key",
-        ]
+        # Handle voice parameter
+        if "voice" in self.params:
+            self.voice = self.params["voice"]
+            del self.params["voice"]
 
-        for field_name in required_fields:
-            value = getattr(self, field_name)
-            if not value or (isinstance(value, str) and value.strip() == ""):
-                raise ValueError(
-                    f"required fields are missing or empty: params.{field_name}"
-                )
+    def to_str(self) -> str:
+        """
+        Convert the configuration to a string representation, masking sensitive data.
+        """
+        return (
+            f"CosyTTSConfig(api_key={mask_sensitive_data(self.api_key)}, "
+            f"model='{self.model}', "
+            f"sample_rate='{self.sample_rate}', "
+            f"voice='{self.voice}', "
+            f"dump='{self.dump}', "
+            f"dump_path='{self.dump_path}', "
+            f"params={self.params}, "
+        )
